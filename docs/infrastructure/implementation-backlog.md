@@ -123,3 +123,9 @@ Dependencies: P1-018. Complexity: S. Related ADR: 0014.
 Description: Opens the phase-audit PR required at the end of every phase per the branch policy. Audits the delivery system against the phase plan and records the outcome.
 
 Dependencies: P1-018. Complexity: S. Related ADR: 0015.
+
+### **P1-021: Fix baseline unit test failures surfaced by Phase 0 CI (theme inflation + startup NPEs)**
+
+Description: Fixes the pre-existing unit test failures first surfaced by the Phase 0 CI run on PR #3 (ci/github-app-bot, run 31125842788). Failing tests: `LayoutInflationTest.allLayoutsInflateSuccessfully` (InflateException on `app/src/main/res/layout/activity_app_view.xml` line 45 — component style requires `Theme.MaterialComponents` or a descendant, but the app theme does not derive from it); `SimpleStartupTest.testApplicationOnCreate` and `StartupCrashTest.testUiHelperCrash` (NullPointerException: `Cannot invoke "android.content.Context.getFilesDir()" because "this.mBase" is null` — app startup code touches Context in a mocked environment). Repair approach is at the orchestrator's discretion: fix the app theme/layout to satisfy MaterialComponents, harden the startup path against null Context, or replace the baseline tests with Robolectric-backed ones that exercise the startup path properly. Acceptance: `./gradlew testNonRoot_gameDebugUnitTest` (or the CI `test` job) is green on the default branch.
+
+Dependencies: none. Complexity: M. Related ADR: 0014. Priority: HIGH — unblocks the CI gate for all subsequent P1 items (P1-010, P1-011, P1-017).
