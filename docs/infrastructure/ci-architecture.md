@@ -165,6 +165,8 @@ Common metadata: all container jobs run on self-hosted Linux runners with rootle
 
 ## Pipeline Tiers
 
+**Fork-PR security model:** Pull requests from forks run only non-secret jobs (lint, unit-tests, docs-validate, security-scan with public scanner rules). No GitHub Secrets, signing keys, device runners, or Memtrace daemon access are exposed to fork PRs. Fork PRs cannot trigger release-sign, device-test, compat-test, windows-host-test, or memtrace-sync jobs. Cache keys include a fork flag to prevent cache poisoning from fork builds affecting main-branch caches.
+
 Define per-commit (formatting, lint, fast unit tests, docs validate, secret/dependency checks), per-PR (full tests, API-tier matrix, Memtrace review, acceptance/edge/blind/security reviews, SBOM delta, evidence audit), nightly (emulator/device compat, dependency freshness, contract fixtures, extended stream/reconnect tests), release-candidate (real Google TV Streamer + compat hardware, official host integration, long-session/fault tests, signed artifacts, provenance, SBOM, checksums, rollback rehearsal). Each tier: jobs included, triggers, timeout, cache policy, required artifacts.
 
 ### Per-commit

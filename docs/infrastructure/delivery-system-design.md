@@ -76,3 +76,9 @@ This document is the master integration reference for the CandelaMoon delivery s
 
 - Reference: incident-and-rollback-policy.md
 - Summary: bad-release, compromised-dependency, stale-graph procedures.
+
+## Agent Architecture
+
+- Reference: spec section 15 (Agent Architecture And Task Workflow)
+- Summary: 7 production agents (Senior Developer, QA Architect, DevOps Architect, Security Analyst, GRC Architect, Tech Writer, UX/UI Designer) and 5 review agents (Blind Hunter, Edge Case Hunter, Acceptance Analyst, Red Team, Blue Team). Handoff protocol connects agents. Session handouts prevent context rot.
+- ADRs: 0015 (multi-agent architecture), 0016 (ATDD red-phase), 0017 (two-phase review), 0018 (red/blue team), 0019 (coverage audit with Memtrace), 0020 (session handout).
