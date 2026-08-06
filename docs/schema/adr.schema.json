@@ -1,0 +1,88 @@
+{
+  "": "https://magalz.github.io/CandelaMoon/schemas/adr.schema.json",
+  "title": "Architecture Decision Record",
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "status",
+    "date",
+    "context",
+    "decision",
+    "consequences",
+    "alternatives"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^\\d{4}$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 3
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "proposed",
+        "accepted",
+        "superseded",
+        "deprecated"
+      ]
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "supersedes": {
+      "type": "string",
+      "pattern": "^\\d{4}$"
+    },
+    "superseded_by": {
+      "type": "string",
+      "pattern": "^\\d{4}$"
+    },
+    "spec_section": {
+      "type": "string"
+    },
+    "context": {
+      "type": "string",
+      "minLength": 20
+    },
+    "decision": {
+      "type": "string",
+      "minLength": 10
+    },
+    "consequences": {
+      "type": "string",
+      "minLength": 10
+    },
+    "alternatives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "rejection_reason"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 3
+          },
+          "rejection_reason": {
+            "type": "string",
+            "minLength": 10
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

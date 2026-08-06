@@ -1,0 +1,159 @@
+{
+  "": "https://magalz.github.io/CandelaMoon/schemas/capability-row.schema.json",
+  "title": "Capability Contract Row",
+  "type": "object",
+  "required": [
+    "capability_id",
+    "domain",
+    "user_value",
+    "upstream_release",
+    "upstream_commit",
+    "host_contract",
+    "client_implementation",
+    "state_owner",
+    "disposition",
+    "mvp_status",
+    "min_api",
+    "fallback",
+    "error_states",
+    "confidence",
+    "evidence_status"
+  ],
+  "properties": {
+    "capability_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "domain": {
+      "type": "string",
+      "enum": [
+        "identity-install-trust",
+        "discovery-pairing",
+        "host-metadata-negotiation",
+        "app-catalog-artwork",
+        "launch-resume-quit-session",
+        "stream-config-transport",
+        "video-audio-hdr-codec-display",
+        "controller-keyboard-mouse-touch-feedback",
+        "in-stream-controls-recovery",
+        "local-profiles-settings",
+        "diagnostics-logs-compat-reporting",
+        "android-tv-launcher-focus-lifecycle-updates"
+      ]
+    },
+    "user_value": {
+      "type": "string",
+      "minLength": 5
+    },
+    "upstream_release": {
+      "type": "string",
+      "minLength": 1
+    },
+    "upstream_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$"
+    },
+    "host_contract": {
+      "type": "string",
+      "minLength": 5
+    },
+    "client_implementation": {
+      "type": "string",
+      "minLength": 5
+    },
+    "state_owner": {
+      "type": "string",
+      "enum": [
+        "client",
+        "host",
+        "shared"
+      ]
+    },
+    "disposition": {
+      "type": "string",
+      "enum": [
+        "retain-client",
+        "adapt-to-luminal",
+        "consume-existing-host",
+        "drop-unsupported",
+        "drop-mobile",
+        "defer-host-dependent",
+        "propose-client-only"
+      ]
+    },
+    "disposition_rationale": {
+      "type": "string"
+    },
+    "mvp_status": {
+      "type": "string",
+      "enum": [
+        "in-mvp",
+        "deferred",
+        "excluded"
+      ]
+    },
+    "min_api": {
+      "type": "integer",
+      "minimum": 28
+    },
+    "platform_tier": {
+      "type": "string",
+      "enum": [
+        "compatibility-28-30",
+        "primary-31-plus",
+        "both"
+      ]
+    },
+    "fallback": {
+      "type": "string"
+    },
+    "error_states": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "security_privacy_notes": {
+      "type": "string"
+    },
+    "test_evidence": {
+      "type": "string"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "evidence_status": {
+      "type": "string",
+      "enum": [
+        "verified",
+        "inferred",
+        "stale",
+        "unknown"
+      ]
+    },
+    "related_adr": {
+      "type": "string",
+      "pattern": "^\\d{4}$"
+    },
+    "related_task": {
+      "type": "string"
+    },
+    "related_branch": {
+      "type": "string"
+    },
+    "related_pr": {
+      "type": "integer"
+    },
+    "memtrace_records": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

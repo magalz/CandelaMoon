@@ -1,0 +1,88 @@
+{
+  "": "https://magalz.github.io/CandelaMoon/schemas/device-matrix-row.schema.json",
+  "title": "Device Matrix Row",
+  "type": "object",
+  "required": [
+    "device_name",
+    "os_api_level",
+    "soc",
+    "decoder_codecs",
+    "hdr_support",
+    "frame_rate_behavior",
+    "controller_rumble_support",
+    "network_path",
+    "platform_tier",
+    "test_date",
+    "test_result"
+  ],
+  "properties": {
+    "device_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "os_api_level": {
+      "type": "integer",
+      "minimum": 28
+    },
+    "soc": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decoder_codecs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "hdr_support": {
+      "type": "string",
+      "enum": [
+        "hdr10",
+        "hdr10plus",
+        "dolby-vision",
+        "sdr-only"
+      ]
+    },
+    "frame_rate_behavior": {
+      "type": "string"
+    },
+    "controller_rumble_support": {
+      "type": "string",
+      "enum": [
+        "full",
+        "partial",
+        "none"
+      ]
+    },
+    "network_path": {
+      "type": "string",
+      "enum": [
+        "wifi",
+        "ethernet",
+        "both"
+      ]
+    },
+    "platform_tier": {
+      "type": "string",
+      "enum": [
+        "compatibility-28-30",
+        "primary-31-plus"
+      ]
+    },
+    "test_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "test_result": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "fail",
+        "pending"
+      ]
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}
