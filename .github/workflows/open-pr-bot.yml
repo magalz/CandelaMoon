@@ -1,0 +1,51 @@
+name: Open PR as Bot
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Source branch to create PR from'
+        required: true
+      base:
+        description: 'Target branch (default: moonlight-noir)'
+        required: false
+        default: 'moonlight-noir'
+      title:
+        description: 'PR title'
+        required: true
+      body:
+        description: 'PR body (markdown)'
+        required: false
+        default: ''
+      draft:
+        description: 'Create as draft PR? (true/false)'
+        required: false
+        default: 'true'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Create pull request as bot
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          ARGS="--base ${{ inputs.base }} --head ${{ inputs.branch }} --title ${{ inputs.title }}"
+          if [ "${{ inputs.draft }}" = "true" ]; then
+            ARGS="$ARGS --draft"
+          fi
+          if [ -n "${{ inputs.body }}" ]; then
+            ARGS="$ARGS --body ${{ inputs.body }}"
+          fi
+          gh pr create --repo magalz/CandelaMoon $ARGS
