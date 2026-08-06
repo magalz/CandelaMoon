@@ -1,0 +1,315 @@
+{
+  "": "https://magalz.github.io/CandelaMoon/schemas/evidence-manifest.schema.json",
+  "title": "Evidence Manifest",
+  "type": "object",
+  "required": [
+    "change_id",
+    "phase",
+    "task",
+    "status",
+    "repository",
+    "branch",
+    "base_sha",
+    "head_sha",
+    "pr_url",
+    "acceptance_criteria",
+    "memtrace_repo_id",
+    "memtrace_indexed_sha",
+    "memtrace_episode_ids",
+    "capability_rows",
+    "adrs",
+    "verification"
+  ],
+  "properties": {
+    "change_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "phase": {
+      "type": "string",
+      "pattern": "^Phase \\d+$"
+    },
+    "task": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "in-progress",
+        "review",
+        "coverage-audit",
+        "uat",
+        "done",
+        "blocked"
+      ]
+    },
+    "repository": {
+      "type": "string",
+      "minLength": 1
+    },
+    "branch": {
+      "type": "string",
+      "minLength": 1
+    },
+    "base_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$"
+    },
+    "head_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$"
+    },
+    "pr_url": {
+      "type": "string"
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "peer_pr": {
+      "type": "object",
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "pr_number": {
+          "type": "integer"
+        },
+        "merge_dependency": {
+          "type": "string",
+          "enum": [
+            "must_merge_first",
+            "independent",
+            "must_merge_after"
+          ]
+        }
+      }
+    },
+    "memtrace_repo_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "memtrace_indexed_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$"
+    },
+    "memtrace_episode_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "capability_rows": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "adrs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^\\d{4}$"
+      }
+    },
+    "verification": {
+      "type": "object",
+      "required": [
+        "tests_pass",
+        "memtrace_review",
+        "acceptance_audit",
+        "edge_case_hunt",
+        "blind_hunt",
+        "security_review",
+        "policy_check"
+      ],
+      "properties": {
+        "tests_pass": {
+          "type": "boolean"
+        },
+        "memtrace_review": {
+          "type": "boolean"
+        },
+        "acceptance_audit": {
+          "type": "boolean"
+        },
+        "edge_case_hunt": {
+          "type": "boolean"
+        },
+        "blind_hunt": {
+          "type": "boolean"
+        },
+        "security_review": {
+          "type": "boolean"
+        },
+        "policy_check": {
+          "type": "boolean"
+        }
+      }
+    },
+    "tdd_artifacts": {
+      "type": "object",
+      "properties": {
+        "atdd_checklist": {
+          "type": "string"
+        },
+        "test_files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "red_phase_verified": {
+          "type": "boolean"
+        }
+      }
+    },
+    "implementation_artifacts": {
+      "type": "object",
+      "properties": {
+        "files_created": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "files_modified": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "green_phase_verified": {
+          "type": "boolean"
+        }
+      }
+    },
+    "review_phase_1": {
+      "type": "object",
+      "properties": {
+        "blind_hunter_findings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "edge_case_hunter_findings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "acceptance_analyst_findings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "triaged_findings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fixes_applied": {
+          "type": "boolean"
+        }
+      }
+    },
+    "review_phase_2": {
+      "type": "object",
+      "properties": {
+        "red_team_findings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blue_team_findings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "triaged_findings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fixes_applied": {
+          "type": "boolean"
+        }
+      }
+    },
+    "coverage_audit": {
+      "type": "object",
+      "properties": {
+        "rating": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "conditional-pass",
+            "fail"
+          ]
+        },
+        "risk_weighted_score": {
+          "type": "integer"
+        },
+        "memtrace_reconciliation": {
+          "type": "string"
+        },
+        "coverage_gaps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "uat": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "passed",
+            "failed"
+          ]
+        },
+        "user_decision": {
+          "type": "string"
+        }
+      }
+    },
+    "documentation": {
+      "type": "object",
+      "properties": {
+        "tech_writer_artifacts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "session_handout": {
+          "type": "string"
+        }
+      }
+    },
+    "known_debt": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rollback_strategy": {
+      "type": "string",
+      "minLength": 5
+    }
+  }
+}
