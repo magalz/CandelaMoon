@@ -41,11 +41,14 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          ARGS="--base ${{ inputs.base }} --head ${{ inputs.branch }} --title ${{ inputs.title }}"
+          ARGS=(--base "${{ inputs.base }}" --head "${{ inputs.branch }}" --title "${{ inputs.title }}")
           if [ "${{ inputs.draft }}" = "true" ]; then
-            ARGS="$ARGS --draft"
+            ARGS+=(--draft)
           fi
           if [ -n "${{ inputs.body }}" ]; then
-            ARGS="$ARGS --body ${{ inputs.body }}"
+            cat > "$RUNNER_TEMP/pr-body.md" <<'CANDELAMOON_PR_BODY_EOF'
+          ${{ inputs.body }}
+          CANDELAMOON_PR_BODY_EOF
+            ARGS+=(--body-file "$RUNNER_TEMP/pr-body.md")
           fi
-          gh pr create --repo magalz/CandelaMoon $ARGS
+          gh pr create --repo magalz/CandelaMoon "${ARGS[@]}"
