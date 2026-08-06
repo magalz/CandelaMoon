@@ -40,7 +40,7 @@ docs/
     0000-template.md
     0001-luminalshine-only-compatibility.md
     0002-classic-transport-only.md
-    ... (14 ADRs total)
+    ... (20 ADRs total)
   infrastructure/
     delivery-system-design.md
     ci-architecture.md
@@ -65,6 +65,29 @@ scripts/
 
 ---
 
+## Task Workflow (14-Step Pipeline)
+
+Every task in this plan flows through this pipeline per spec section 15.2:
+
+1. Orchestrator creates task handoff (this plan provides the acceptance criteria)
+2. QA Architect creates TDD red-phase test scaffolds (for tasks with testable behavior)
+3. Senior Developer (or DevOps/Security agent for infra tasks) implements solution
+4. Review Phase 1 (parallel): Blind Hunter, Edge Case Hunter, Acceptance Analyst
+5. Orchestrator triages Phase 1 findings into handoff
+6. Developer implements Phase 1 fixes
+7. Review Phase 2 (sequential): Red Team Analyst then Blue Team Analyst
+8. Orchestrator triages Phase 2 findings into handoff
+9. Developer implements security fixes
+10. QA Architect runs coverage audit with Memtrace reconciliation
+11. UAT (user) when applicable
+12. Tech Writer documents everything
+13. Orchestrator opens PR using Memtrace code-review
+14. Tech Writer creates session handout
+
+**Bootstrap exception (spec section 12):** For Phase 0 documentation tasks, the TDD red phase (step 2) and coverage audit (step 10) apply only to the validator script (Task 2). Pure documentation tasks skip steps 2 and 10 but still require Review Phases 1-2, Tech Writer documentation, and PR creation.
+
+---
+
 ## Task 1: Machine-Readable Schemas
 
 **Files:**
@@ -82,7 +105,7 @@ Create `docs/schemas/adr.schema.json` with JSON Schema draft 2020-12 requiring f
 
 - [ ] **Step 2: Create the evidence-manifest schema**
 
-Create `docs/schemas/evidence-manifest.schema.json` requiring fields: change_id, phase (pattern `^Phase \d+$`), task, repository, branch, base_sha, head_sha, memtrace_repo_id, memtrace_indexed_sha, memtrace_episode_ids, capability_rows, adrs, verification (object with boolean fields: tests_pass, memtrace_review, acceptance_audit, edge_case_hunt, blind_hunt, security_review, policy_check), and optional: peer_pr, known_debt, rollback_strategy.
+Create `docs/schemas/evidence-manifest.schema.json` requiring fields: change_id, phase (pattern `^Phase \d+$`), task, repository, branch, base_sha, head_sha, memtrace_repo_id, memtrace_indexed_sha, memtrace_episode_ids, capability_rows, adrs, verification (object with boolean fields: tests_pass, memtrace_review, acceptance_audit, edge_case_hunt, blind_hunt, security_review, policy_check), and optional: peer_pr, known_debt, rollback_strategy. Additionally include handoff fields from spec section 15.3: tdd_artifacts (object with atdd_checklist path, test_files array, red_phase_verified boolean), implementation_artifacts (object with files_created array, files_modified array, green_phase_verified boolean), review_phase_1 (object with blind_hunter_findings, edge_case_hunter_findings, acceptance_analyst_findings, triaged_findings, fixes_applied boolean), review_phase_2 (object with red_team_findings, blue_team_findings, triaged_findings, fixes_applied boolean), coverage_audit (object with rating enum, risk_weighted_score integer, memtrace_reconciliation string, coverage_gaps array), uat (object with status enum, user_decision string), documentation (object with tech_writer_artifacts array, session_handout string).
 
 - [ ] **Step 3: Create the capability-row schema**
 
@@ -176,17 +199,17 @@ Spec: docs/superpowers/specs/2026-08-05-candelamoon-roadmap-design.md section 8.
 
 **Files:**
 - Create: `docs/adr/0000-template.md`
-- Create: `docs/adr/0001` through `docs/adr/0014` (14 ADR files)
+- Create: `docs/adr/0001` through `docs/adr/0020` (20 ADR files)
 
 **Interfaces:**
 - Consumes: `docs/schemas/adr.schema.json` (Task 1)
-- Produces: 14 ADR files with YAML frontmatter conforming to the ADR schema
+- Produces: 20 ADR files with YAML frontmatter conforming to the ADR schema
 
 - [ ] **Step 1: Create ADR template `0000-template.md`**
 
 A markdown file with YAML frontmatter containing all required ADR schema fields with placeholder values, followed by a body template expanding context, decision, consequences, and alternatives.
 
-- [ ] **Step 2: Write ADRs 0001-0014**
+- [ ] **Step 2: Write ADRs 0001-0020**
 
 Each ADR has YAML frontmatter (conforming to `adr.schema.json`) plus a markdown body expanding each section. Key decisions:
 
@@ -204,6 +227,23 @@ Each ADR has YAML frontmatter (conforming to `adr.schema.json`) plus a markdown 
 - **0012**: Every feature gets a disposition. No deletion without Memtrace impact, evidence, tests, rollback, doc updates.
 - **0013**: GitHub authoritative for source. Memtrace authoritative for derived evidence. Conflict = stop, sync, regenerate, update via PR.
 - **0014**: Podman-first. Rootless, non-root, pinned by digest. Audited host-bound exceptions for devices/Windows/signing.
+- **0015**: Multi-agent architecture with production agents (Senior Developer, QA Architect, DevOps Architect, Security Analyst, GRC Architect, Tech Writer, UX/UI Designer) and review agents (Blind Hunter, Edge Case Hunter, Acceptance Analyst, Red Team, Blue Team). Handoff protocol connects agents.
+- **0016**: ATDD red-phase-before-implementation. QA Architect creates failing test scaffolds before any implementation. No scaffold passes before code exists.
+- **0017**: Two-phase adversarial review. Phase 1: Blind Hunter, Edge Case Hunter, Acceptance Analyst (parallel, no handoff). Phase 2: Red Team then Blue Team (sequential security review).
+- **0018**: Red/blue team security review. Red Team finds exploitable weaknesses with STRIDE/OWASP. Blue Team designs concrete mitigations and assesses exploitability.
+- **0019**: Coverage audit with Memtrace reconciliation as exit gate. QA Architect uses detect_changes, get_evolution, get_episode_replay to verify what changed vs what was documented. No task exits without coverage rating.
+- **0020**: Session handout for context continuity. Tech Writer creates self-contained handout at end of every task/phase to prevent context rot across sessions.
+
+- [ ] **Step 2b: Write ADRs 0015-0020 (Agent Architecture)**
+
+Each ADR follows the same template. Key decisions:
+
+- **0015**: Multi-agent architecture and handoff protocol. Production agents (Senior Developer, QA Architect, DevOps Architect, Security Analyst, GRC Architect, Tech Writer, UX/UI Designer) receive and update the handoff. Review agents (Blind Hunter, Edge Case Hunter, Acceptance Analyst, Red Team, Blue Team) receive only need-to-know info and never update the handoff. Orchestrator acts as Product Owner.
+- **0016**: ATDD red-phase-before-implementation. QA Architect creates failing/ignored test scaffolds before any implementation. Developer activates one test at a time (red to green). Red phase is mandatory for features and bug fixes.
+- **0017**: Two-phase adversarial review. Phase 1: Blind Hunter, Edge Case Hunter, Acceptance Analyst run in parallel without handoff or author rationale. Phase 2: Red Team then Blue Team run sequentially for security.
+- **0018**: Red/blue team security review approach. Red Team finds exploitable weaknesses with concrete attack scenarios using STRIDE and OWASP. Blue Team receives red team findings and designs concrete, implementable mitigations. Blue Team confirms or rejects findings and checks for new risks.
+- **0019**: Coverage audit with Memtrace reconciliation as exit gate. QA Architect builds static mapping of test scenarios to tests to ACs. Memtrace detect_changes/get_evolution/get_episode_replay verify what actually changed. Rating: pass/conditional/fail. Fail returns to developer.
+- **0020**: Session handout for context continuity. Tech Writer creates self-contained handout at end of every task/phase with branch, commit, PR, artifacts, pending work, keys for next session, known debt, rollback strategy. Prevents context rot across sessions.
 
 Each ADR frontmatter includes: id, title, status (accepted), date (2026-08-05), spec_section, context, decision, consequences, alternatives (at least 2 with rejection reasons), evidence.
 
@@ -218,13 +258,16 @@ Expected: ADR template, validation, and sequencing checks PASS. Infra doc checks
 
 ```bash
 git add docs/adr/
-git commit -m "docs(adr): add ADR template and initial 14-decision register
+git commit -m "docs(adr): add ADR template and initial 20-decision register
 
 Task 3 of Phase 0 delivery-system design.
-ADRs 0001-0014: LuminalShine-only, classic transport, Artemis freeze,
+ADRs 0001-0020: LuminalShine-only, classic transport, Artemis freeze,
 integration lab, new app identity, TV-only, platform tiers, adaptive UI,
 Compose evaluation, state ownership, MVP host constraint, disposition
 policy, split authority, Podman-first.
+ADRs 0015-0020: Multi-agent architecture, ATDD red-phase, two-phase
+adversarial review, red/blue team security, coverage audit with Memtrace,
+session handout for context continuity.
 Spec: section 5.4"
 ```
 
@@ -427,7 +470,7 @@ Confirm every Phase 0 deliverable in spec section 9.1 maps to a design artifact.
 
 - [ ] **Step 3: Acceptance audit**
 
-Confirm: 14 ADRs conform to schema, 4 JSON Schemas valid, validator runs clean, 10 infra docs have required sections, backlog has 20 items, toolchain pins specify exact versions.
+Confirm: 20 ADRs conform to schema, 4 JSON Schemas valid, validator runs clean, 10 infra docs have required sections, backlog has 20 items, toolchain pins specify exact versions.
 
 - [ ] **Step 4: Edge-case hunt**
 
@@ -483,4 +526,4 @@ Create a draft PR titled `docs: Phase 0 — Delivery-System Design (phase audit)
 
 **2. Placeholder scan:** TBD/TODO/fill-in checked and confirmed resolved. All 14 CDRs have concrete decisions with spec references per Step 2 of Task 3. Schemas have concrete fields with defined types and enums. Implementation backlog has 20 concrete items with IDs.
 
-**3. Type consistency:** ADR schema id field uses ^\d{4}$ pattern; all ADR files follow 0001-0014 format. Evidence manifest base_sha/head_sha use ^[0-9a-f]{7,40}$. Capability-row domain enum has 12 entries matching spec section 4.3. Device-matrix platform_tier enum matches ADR 0007 tiers.
+**3. Type consistency:** ADR schema id field uses ^\d{4}$ pattern; all ADR files follow 0001-0020 format. Evidence manifest base_sha/head_sha use ^[0-9a-f]{7,40}$. Capability-row domain enum has 12 entries matching spec section 4.3. Device-matrix platform_tier enum matches ADR 0007 tiers.

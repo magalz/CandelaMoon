@@ -253,6 +253,12 @@ The initial register covers:
 - Feature disposition and deletion evidence policy.
 - GitHub and Memtrace split authority and synchronization gate.
 - Podman-first execution and audited host-bound exceptions.
+- Multi-agent architecture and handoff protocol.
+- ATDD red-phase-before-implementation.
+- Two-phase adversarial review (adversarial then security).
+- Red/blue team security review approach.
+- Coverage audit with Memtrace reconciliation as exit gate.
+- Session handout for context continuity.
 
 ### 5.5 Upstream Movement
 
@@ -688,3 +694,79 @@ The architecture and mapping milestone is complete when:
 - The Podman-first delivery foundation has passed its canary.
 
 Only then does product feature implementation begin.
+
+## 15. Agent Architecture And Task Workflow
+
+### 15.1 Agent Roster
+
+The program uses a multi-agent architecture with split responsibilities. Production agents receive the handoff file and update it. Review agents receive only need-to-know information and never update the handoff.
+
+**Production Agents:**
+
+- **Senior Developer**: Implements code per task spec and TDD suite. Java/Android, Kotlin/Compose for TV, NDK/JNI, streaming protocol. Activates tests one at a time (red to green), refactors while green, updates handoff with implementation evidence.
+- **QA Architect**: Creates TDD red-phase test scaffolds before implementation. Runs coverage audits with Memtrace reconciliation after implementation. Gates tasks between development and UAT.
+- **DevOps Architect**: Podman-first container design, GitHub Actions CI, self-hosted runners, device lab, signing, release engineering.
+- **Security Analyst**: Threat modeling, supply chain policy, secrets management, signing policy, incident response, DevSecOps design.
+- **GRC Architect**: ADR governance, compliance checks, waiver management, policy enforcement, audit trails. Ensures no undocumented decision affects the product boundary.
+- **Tech Writer**: Documents every artifact, creates session handouts to prevent context rot, maintains handoff file with finalized information.
+- **UX/UI Designer**: Visual design system, TV UX patterns, accessibility, D-pad flows, Compose for TV evaluation.
+
+**Review Agents (no handoff access, need-to-know only, never update handoff):**
+
+- **Blind Hunter**: Cynical adversarial reviewer with zero context. Finds what is missing. Receives only: spec, diff, tests. No author rationale.
+- **Edge Case Hunter**: Exhaustive path enumeration, boundary conditions, deletion check. Method-driven, not attitude-driven. Receives only: diff.
+- **Acceptance Analyst**: Reviews diff against spec and acceptance criteria. Finds deviations from spec intent. Receives only: spec and diff.
+- **Red Team Analyst**: Offensive security reviewer. Finds exploitable weaknesses with concrete attack scenarios using STRIDE and OWASP. Receives: diff and spec for context.
+- **Blue Team Analyst**: Defensive security reviewer. Receives red team findings and designs concrete, implementable mitigations. Assesses exploitability, confirms or rejects findings, checks for new risks introduced by mitigations.
+
+The orchestrator (the main session agent) acts as Product Owner: creates task breakdowns with acceptance criteria, maintains the handoff file, dispatches agents, triages review findings, gates transitions, opens PRs using Memtrace code-review, and manages the phase-audit cycle.
+
+### 15.2 Task Workflow
+
+Every leaf task flows through this pipeline:
+
+1. **Orchestrator creates task handoff**: Detailed to-do with acceptance criteria, need-to-know context scoped per agent, evidence manifest initialized.
+2. **QA Architect creates TDD red-phase suite**: Test scaffolds (failing or skipped), ATDD checklist with implementation guide, test artifacts in handoff.
+3. **Senior Developer implements solution**: Activates tests one at a time (green), refactors while green, updates handoff with implementation evidence.
+4. **Review Phase 1 (parallel, no handoff access)**: Blind Hunter, Edge Case Hunter, and Acceptance Analyst receive only need-to-know info. They run in parallel without prior conversation context.
+5. **Orchestrator triages Phase 1 findings**: Normalize, deduplicate, assign severity, route (decision-needed, patch, defer, dismiss). Add decision-needed and patch findings to handoff. Decision-needed findings require user input.
+6. **Senior Developer implements Phase 1 fixes**: Updates handoff with fix evidence.
+7. **Review Phase 2 (security, sequential)**: Red Team Analyst runs first (offensive). Blue Team Analyst runs second (defensive, acts on red team findings).
+8. **Orchestrator triages Phase 2 findings**: Add to handoff. Patch findings go to developer.
+9. **Senior Developer implements security fixes**: Updates handoff with fix evidence.
+10. **QA Architect runs coverage audit**: Risk-weighted score per AC, Memtrace reconciliation (detect_changes, get_evolution), coverage rating (pass/conditional/fail). If fail, back to step 3 with coverage tasks.
+11. **UAT (user)**: When applicable, user tests the implementation.
+12. **Tech Writer documents everything**: Architecture docs, ADRs, capability rows, session handout. Updates handoff with all finalized artifacts.
+13. **Orchestrator opens PR using Memtrace code-review**: review_github_pr against the synchronized graph.
+14. **Tech Writer creates session handout**: All paths, artifacts, and state for the next phase/task to be started in a new session (prevents context rot).
+
+Every step must produce the documentation expected from that agent so the tech writer has every artifact to create the final documentation.
+
+### 15.3 Handoff File Structure
+
+Every task has a handoff file (YAML frontmatter + markdown body) containing:
+
+- Task metadata: task_id, phase, title, status, branch, base_sha, current_sha, pr_url
+- Acceptance criteria: list of testable criteria
+- TDD artifacts: ATDD checklist path, test files, red-phase verification
+- Implementation artifacts: files created/modified, green-phase verification
+- Review Phase 1: blind/edge/acceptance findings, triaged findings, fixes applied
+- Review Phase 2: red/blue team findings, triaged findings, fixes applied
+- Coverage audit: rating, risk-weighted score, Memtrace reconciliation, coverage gaps
+- UAT: status, user decision
+- Documentation: tech writer artifacts, session handout path
+- Memtrace evidence: repo_id, indexed_sha, episode_ids, detect_changes summary
+- Known debt and rollback strategy
+
+The handoff file is the single source of truth for task state. Every agent that participates updates it. Review agents do not see or update it.
+
+### 15.4 Session Handout
+
+At the end of every task or phase, the Tech Writer creates a session handout document that contains everything needed to continue work in a new session without conversation history:
+
+- Current state: branch, commit SHA, PR URL, Memtrace indexed SHA
+- Artifacts produced: file paths and descriptions
+- Pending work: next task description and dependencies
+- Keys for next session: handoff file path, spec path, ADR register path, evidence manifest path, test artifact paths
+- Known debt: deferred or incomplete items
+- Rollback strategy: how to undo this work if needed
