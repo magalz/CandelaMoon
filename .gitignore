@@ -47,3 +47,7 @@ app/.externalNativeBuild/
 
 # agent files
 AGENTS.md
+
+# Local architecture and embedding references
+.memtrace/
+new-design/
