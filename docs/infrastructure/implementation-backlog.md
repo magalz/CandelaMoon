@@ -58,9 +58,9 @@ Description: Creates the evidence-manifest YAML template used to link red/green 
 
 Dependencies: none. Complexity: S. Related ADR: 0013.
 
-### **P1-010: Add per-commit CI workflow (lint, format, fast tests, docs validate, secret scan)**
+### **P1-010: Add per-commit CI workflow (lint, format, fast tests, docs validate, secret scan, Codecov)**
 
-Description: Adds the per-commit CI workflow running lint, format, fast tests, docs validate, and secret scan in the containerized environment. Provides fast feedback on every commit.
+Description: Adds the per-commit CI workflow running lint, format, fast tests, docs validate, secret scan, and JaCoCo coverage upload to Codecov. Provides fast feedback on every commit. GitHub Actions workflow YAML at `.github/workflows/ci.yml`.
 
 Dependencies: P1-001 through P1-005. Complexity: L. Related ADR: 0014.
 

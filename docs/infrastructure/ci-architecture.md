@@ -110,7 +110,8 @@ Common metadata: all container jobs run on self-hosted Linux runners with rootle
 ### 2. unit-tests
 - **Image**: candelamoon-android | **Trigger**: push (fast lane: unit tests only), PR (full), nightly
 - **Inputs**: source tree, gradle cache volume
-- **Outputs**: `reports/test/*/TEST-*.xml` (JUnit XML), coverage report, aggregated `test` task output (root `build.gradle:21-32` aggregates all `*UnitTest` tasks)
+- **Outputs**: `reports/test/*/TEST-*.xml` (JUnit XML), JaCoCo coverage report (`app/build/reports/jacoco/jacoco.xml`), aggregated `test` task output (root `build.gradle:21-32` aggregates all `*UnitTest` tasks)
+- **Coverage**: JaCoCo XML report uploaded to Codecov via `codecov/codecov-action@v5` with `CODECOV_TOKEN` secret. Flags: `unit`. Coverage trends tracked at codecov.io.
 - **Validates**: JVM unit tests + Robolectric tests (targetSdk 34 runtime) for all flavors; no native/hardware dependency
 
 ### 3. docs-validate
