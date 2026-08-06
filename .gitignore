@@ -52,3 +52,4 @@ AGENTS.md
 .memtrace/
 new-design/
 __pycache__/
+docs/handoffs/
