@@ -51,3 +51,4 @@ AGENTS.md
 # Local architecture and embedding references
 .memtrace/
 new-design/
+__pycache__/
