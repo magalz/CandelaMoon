@@ -63,6 +63,18 @@
         <item name="android:windowBackground">@android:color/black</item>
     </style>
 
+    <!--
+        Scoped FAB workaround for the four Material FAB instances in activity_app_view,
+        activity_pc_view (and layout-land), and activity_profiles. The parents are the
+        exact widget default styles, so production attribute resolution is unchanged;
+        the two flags only relax ThemeEnforcement for these instances so they inflate
+        under non-Material contexts (the P1-021 unit-test contract, and the production
+        ProfilesActivity path on API <= 28 where SettingsTheme is an AppCompat theme).
+        Under the production AppTheme (MaterialComponents on API <= 28, Material3 on
+        API >= 29) the enforcement checks pass natively and the flags are no-ops.
+        Remove these styles only together with the layouts that reference them and the
+        MaterialFabCompatTest coverage that locks the API-tier behavior.
+    -->
     <style name="ProfilesExtendedFabButton" parent="Widget.MaterialComponents.ExtendedFloatingActionButton.Icon">
         <item name="enforceMaterialTheme">false</item>
         <item name="enforceTextAppearance">false</item>
