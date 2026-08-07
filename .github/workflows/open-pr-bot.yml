@@ -29,6 +29,7 @@ permissions:
 jobs:
   create-pr:
     runs-on: ubuntu-latest
+    environment: maestro
     steps:
       - name: Get GitHub App token
         id: app-token
