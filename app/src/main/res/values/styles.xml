@@ -63,6 +63,16 @@
         <item name="android:windowBackground">@android:color/black</item>
     </style>
 
+    <style name="ProfilesExtendedFabButton" parent="Widget.MaterialComponents.ExtendedFloatingActionButton.Icon">
+        <item name="enforceMaterialTheme">false</item>
+        <item name="enforceTextAppearance">false</item>
+    </style>
+
+    <style name="ProfilesFabButton" parent="Widget.MaterialComponents.FloatingActionButton">
+        <item name="enforceMaterialTheme">false</item>
+        <item name="enforceTextAppearance">false</item>
+    </style>
+
     <declare-styleable name="ApertureViewGroup">
         <attr name="aperture_color1" format="color" />
         <attr name="aperture_color2" format="color" />
