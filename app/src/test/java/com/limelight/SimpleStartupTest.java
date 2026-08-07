@@ -12,6 +12,7 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 
 import java.io.File;
+import java.io.FileWriter;
 
 import static org.junit.Assert.*;
 
@@ -67,6 +68,36 @@ public class SimpleStartupTest {
             LimeLog.info("SUCCESS: Application startup no longer crashes!");
         } catch (Exception e) {
             fail("Application onCreate should not crash after fix: " + e.getMessage());
+        }
+    }
+
+    @Test
+    public void testApplicationOnCreateLoadsProfilesWhenAttached() {
+        // Attached startup contract: the Robolectric environment application is a real
+        // attached ArtemisApplication (framework attached the base Context and invoked
+        // onCreate during environment setup). Re-running onCreate on that attached
+        // instance must load a pre-seeded profile from disk.
+        try {
+            ArtemisApplication app = (ArtemisApplication) ApplicationProvider.getApplicationContext();
+            assertNotNull("Attached application should have a base Context", app.getBaseContext());
+
+            File profilesDir = new File(context.getFilesDir(), "profiles");
+            assertTrue("profiles dir should be creatable", profilesDir.mkdirs());
+            File profilesFile = new File(profilesDir, "profiles.json");
+            String seededJson = "{\"profiles\":[{\"uuid\":\"11111111-1111-1111-1111-111111111111\","
+                    + "\"name\":\"SeededProfile\",\"createdUtc\":1,\"modifiedUtc\":1,\"options\":{}}],"
+                    + "\"activeProfileId\":\"11111111-1111-1111-1111-111111111111\"}";
+            try (FileWriter writer = new FileWriter(profilesFile)) {
+                writer.write(seededJson);
+            }
+
+            app.onCreate();
+
+            ProfilesManager manager = ProfilesManager.getInstance();
+            assertEquals("Attached startup must load the seeded profile", 1, manager.getProfiles().size());
+            assertEquals("SeededProfile", manager.getProfiles().get(0).getName());
+        } catch (Exception e) {
+            fail("Attached application startup should load profiles: " + e.getMessage());
         }
     }
 

@@ -1,12 +1,12 @@
 package com.limelight.profiles;
 
 import android.content.Intent;
-import android.widget.ImageButton;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.content.Context;
 import android.app.GameManager;
 
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.limelight.PcView;
 import com.limelight.ProfilesActivity;
 import com.limelight.R;
@@ -74,7 +74,7 @@ public class ProfilesNavigationTest {
         ActivityController<PcView> controller = Robolectric.buildActivity(PcView.class).setup();
         PcView pcView = controller.get();
 
-        ImageButton btn = pcView.findViewById(R.id.profilesButton);
+        ExtendedFloatingActionButton btn = pcView.findViewById(R.id.profilesButton);
         assertNotNull("profilesButton not found", btn);
 
         btn.performClick();
@@ -94,7 +94,7 @@ public class ProfilesNavigationTest {
         ActivityController<AppView> controller = Robolectric.buildActivity(AppView.class, intent).setup();
         AppView appView = controller.get();
 
-        ImageButton btn = appView.findViewById(R.id.profilesButton);
+        ExtendedFloatingActionButton btn = appView.findViewById(R.id.profilesButton);
         assertNotNull("profilesButton not found in AppView", btn);
 
         btn.performClick();
