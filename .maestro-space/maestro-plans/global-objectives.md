@@ -124,3 +124,54 @@ the framework's own conventions.
 - The product can be installed, paired, browsed, launched, streamed, controlled,
   recovered, and disconnected on every supported API tier
 - The post-phase + maintenance discipline holds across all phase boundaries
+
+## 7. Bernstein Path Configuration
+
+> Read first at every session start. No repo scanning needed.
+
+### Phase Plans
+
+| Phase | Status | Plan File | Workspace |
+|---|---|---|---|
+| 0 | Complete | `.maestro-space/maestro-plans/phase-0-delivery-system/phase-plan.md` | `.maestro-space/maestro-works/phase-0-delivery-system/` |
+| 1 | In Progress | `.maestro-space/maestro-plans/phase-1-delivery-system/phase-plan.md` | `.maestro-space/maestro-works/phase-1-delivery-system/` |
+| 2 | Pending | `.maestro-space/maestro-plans/phase-2-repositories-and-baselines/phase-plan.md` | `.maestro-space/maestro-works/phase-2-repositories-and-baselines/` |
+
+### Framework Docs
+
+| Document | Path |
+|---|---|
+| Orchestrator guide | `.maestro-space/maestro-docs/maestro-orchestrator-guide.md` |
+| Workflow | `.maestro-space/maestro-docs/maestro-workflow.md` |
+| Setup guide | `.maestro-space/maestro-docs/maestro-setup.md` |
+| Post-phase guide | `.maestro-space/maestro-docs/maestro-post-phase.md` |
+| Maintenance guide | `.maestro-space/maestro-docs/maestro-maintenance.md` |
+| Conventions | `.maestro-space/maestro-docs/maestro-conventions.md` |
+| Agent registry | `.maestro-space/maestro-agents/agent-manifest.json` |
+| Templates | `.maestro-space/maestro-templates/` |
+
+### Global Files
+
+| Document | Path |
+|---|---|
+| Global objectives (this file) | `.maestro-space/maestro-plans/global-objectives.md` |
+| Master roadmap | `.maestro-space/maestro-plans/master-roadmap.md` |
+
+### External (`/docs/`)
+
+| Resource | Path |
+|---|---|
+| Spec | `docs/superpowers/specs/2026-08-05-candelamoon-roadmap-design.md` |
+| ADR register | `docs/adr/` |
+| Infrastructure | `docs/infrastructure/` |
+| Schemas | `docs/schema/` |
+
+### Session Start Order
+
+1. Read this file §7 — the path map.
+2. Read the orchestrator guide.
+3. Find current phase from the table above → read its phase plan.
+4. Find next Pending task whose deps are Completed → read its task file.
+5. Read the session handout from the previous session.
+6. Check git status, PRs, CI.
+7. Report plan → dispatch.
