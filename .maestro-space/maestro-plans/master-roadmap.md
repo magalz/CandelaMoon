@@ -22,9 +22,9 @@ session (4 architects) + 1 maintenance phase before the next phase may begin
 
 | Phase | Title | Status | Detailed backlog |
 |---|---|---|---|
-| 0 | Delivery-System Design | **DONE** | `.maestro-space/maestro-plans/phase-0-delivery-system-backlog.md` |
-| 1 | Delivery Foundation | **IN PROGRESS** (1/21 tasks) | `.maestro-space/maestro-plans/phase-1-delivery-system-backlog.md` |
-| 2 | Repositories And Baselines | PENDING (next) | `.maestro-space/maestro-plans/phase-2-repositories-and-baselines-backlog.md` |
+| 0 | Delivery-System Design | **DONE** | `.maestro-space/maestro-plans/phase-0-delivery-system/backlog.md` |
+| 1 | Delivery Foundation | **IN PROGRESS** (1/21 tasks) | `.maestro-space/maestro-plans/phase-1-delivery-system/backlog.md` |
+| 2 | Repositories And Baselines | PENDING (next) | `.maestro-space/maestro-plans/phase-2-repositories-and-baselines/backlog.md` |
 | 3 | Two Architecture Spines | PLANNED | — |
 | 4 | Contract, Dispositions, And MVP Spec | PLANNED | — |
 | 5 | Platform Foundation And UI Evaluation | PLANNED | — |
@@ -47,7 +47,7 @@ manifest schemas are committed and pass validation.
 0015 (Multi-agent architecture), 0016 (ATDD red-phase), 0017 (Two-phase adversarial
 review), 0018 (Red/blue security), 0019 (Coverage audit with Memtrace), 0020 (Session
 handout), plus 0001-0012 for product boundaries.
-**Detailed backlog**: `.maestro-space/maestro-plans/phase-0-delivery-system-backlog.md`
+**Detailed backlog**: `.maestro-space/maestro-plans/phase-0-delivery-system/backlog.md`
 **Session artifacts**: `.maestro-space/maestro-works/phase-0-delivery-system/post-phase-0/session-handout.md`
 **Closed PRs**: PR #1 (spec + plan), PR #2 (Phase 0 audit).
 
@@ -63,7 +63,7 @@ device + Windows + evidence + sync); branch protection (P1-006) enforces the gat
 all four images (P1-005) are signed and published to GHCR; the design validator
 (P1-017) runs in CI.
 **Related ADRs**: 0013, 0014, 0015, 0019.
-**Detailed backlog**: `.maestro-space/maestro-plans/phase-1-delivery-system-backlog.md`
+**Detailed backlog**: `.maestro-space/maestro-plans/phase-1-delivery-system/backlog.md`
 (21 tasks: P1-001 through P1-021).
 **Progress**: 1/21 tasks done (P1-021 — baseline test fixes).
 **Next pending**: P1-001 (candelamoon-android Containerfile).
@@ -79,7 +79,7 @@ decisions into a tracked disposition ledger.
 synchronized baselines and no architecture claim depends on a moving branch.
 **Related ADRs**: 0003 (frozen Artemis baseline), 0004 (integration-lab mirror),
 0005 (new app identity).
-**Detailed backlog (stub)**: `.maestro-space/maestro-plans/phase-2-repositories-and-baselines-backlog.md`
+**Detailed backlog (stub)**: `.maestro-space/maestro-plans/phase-2-repositories-and-baselines/backlog.md`
 (decomposed at the start of Phase 2).
 
 **Scope summary**:

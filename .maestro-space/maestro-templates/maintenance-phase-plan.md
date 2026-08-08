@@ -14,7 +14,7 @@
 
 - **Preceding phase**: <Phase N>
 - **Maintenance phase ID range**: <M1-001 .. M1-NNN>
-- **Synthesized by**: Orchestrator (from post-phase reports)
+- **Synthesized by**: Bernstein (from post-phase reports)
 - **Date**: <YYYY-MM-DD>
 
 ---

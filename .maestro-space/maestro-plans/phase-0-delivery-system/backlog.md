@@ -72,7 +72,7 @@ all four roles; produced before the post-phase session template was designed).
 **Equivalent maintenance plan**: the 7 known-debt items (D1-D7) recorded in
 `.maestro-space/maestro-works/phase-0-delivery-system/post-phase-0/session-handout.md`
 are the de facto Phase 0 maintenance backlog. Maintenance items are now tracked as
-M1-NNN in `.maestro-space/maestro-plans/phase-1-delivery-system-backlog.md` (or in
+M1-NNN in `.maestro-space/maestro-plans/phase-1-delivery-system/backlog.md` (or in
 a future maintenance plan file once Phase 1's post-phase session produces one).
 
 ---

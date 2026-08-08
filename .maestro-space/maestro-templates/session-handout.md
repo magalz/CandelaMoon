@@ -26,7 +26,7 @@ Tech Writer produces this at step 14 of the per-task 14-step cycle.
 - **Head SHA**: `<40-char hex>` (with note if workflow-only)
 - **Base SHA**: `<40-char hex>`
 - **PR URL**: <GitHub PR URL, state, draft status, merge status, merge commit if merged>
-- **Memtrace repo_id**: `CandelaMoon`
+- **Memtrace repo_id**: `<repo-id>`
 - **Memtrace indexed SHA**: `<40-char hex>` (equals head; note if graph content is from a
   prior source-code head because the final commit is workflow-only)
 - **Memtrace index**: <node count> / <edge count>, last indexed <ISO timestamp>, branch
@@ -78,7 +78,7 @@ the next session's expected first action.]
 - **Orchestrator guide**: `.maestro-space/maestro-docs/maestro-orchestrator-guide.md`
 - **Workflow**: `.maestro-space/maestro-docs/maestro-workflow.md`
 - **Conventions**: `.maestro-space/maestro-docs/maestro-conventions.md`
-- **Memtrace repo_id**: `CandelaMoon` (indexed at head `<sha>`; <note if workflow-only>)
+- **Memtrace repo_id**: `<repo-id>` (indexed at head `<sha>`; <note if workflow-only>)
 - **Memtrace episode IDs**: `<uuid list>`
 - **Containerized test logs**: `<path>`
 - **Local dev Containerfile** (if any): `<path>`

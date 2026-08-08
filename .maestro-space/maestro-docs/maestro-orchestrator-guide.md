@@ -1,47 +1,48 @@
 # Maestro Orchestrator Guide
 
-> The operational manual for the orchestrator (the main session agent acting as Product Owner).
-> It defines which agent to dispatch for each task type, how to create and manage handoff files,
-> how to scope context per agent, and how to run the review pipeline.
+> The operational manual for Bernstein (the Principal Orchestrator). It defines which
+> agent to dispatch for each task type, how to create and manage handoff files, how
+> to scope context per agent, and how to run the review pipeline.
 >
 > See companion documents:
 > - **`maestro-workflow.md`** — 14-step task cycle and phase scaffolding (post-phase + maintenance).
+> - **`maestro-setup.md`** — rules for the phase setup session.
+> - **`maestro-post-phase.md`** — rules for post-phase execution.
+> - **`maestro-maintenance.md`** — rules for maintenance phase execution.
 > - **`maestro-conventions.md`** — JSON+MD output format, file naming, tag nomenclature, agent contracts.
 
 ---
 
 ## 1. Agent Dispatch Matrix
 
-Map each task type to the correct agent and `subagent_type`. The full registry lives at
-`.maestro-space/maestro-agents/agent-manifest.json`. The matrix below is the dispatch reference.
-
-### Production Agents (receive handoff, update it)
+### Production Agents
 
 | Task Type | Agent | subagent_type | Receives |
 |---|---|---|---|
-| Code implementation (Java/Android, Kotlin/Compose, C/C++/NDK) | Senior Developer | `senior-developer` | Handoff + TDD suite |
-| TDD red-phase scaffold creation | QA Architect | `qa-architect` | Handoff + task spec + AC |
-| Coverage audit + Memtrace reconciliation | QA Architect | `qa-architect` | Handoff + diff + test results |
-| Containerfiles, CI workflows, runners | DevOps Architect | `devops-architect` | Handoff + toolchain-pins + ci-architecture |
-| Threat model, supply chain, secrets policy | Security Analyst | `security-analyst` | Handoff + spec sections |
-| ADR governance, compliance, waiver validation | GRC Architect | `grc-architect` | Handoff + ADR register + evidence manifests |
-| Architecture docs, session handouts, post-phase consolidation | Tech Writer | `tech-writer` | Handoff + all task artifacts |
-| Visual design, TV UX, accessibility, Compose eval | UX/UI Designer | `ux-ui-designer` | Handoff + design reference + spec |
-| Post-phase analysis (4 roles) | grc / qa / security / devops architects | same as above | Whole-phase artifacts |
-| Maintenance phase tasks (per task) | Production agent per dispatch matrix | per task type | Standard handoff |
+| Code implementation | Bach (Senior Developer) | `bach-senior-developer` | Handoff + TDD suite |
+| TDD red-phase scaffolds | Ravel (QA Architect) | `ravel-qa-architect` | Handoff + task spec + AC |
+| Coverage audit + Memtrace reconciliation | Ravel (QA Architect) | `ravel-qa-architect` | Handoff + diff + test results |
+| Container builds, CI, runners, signing | Vivaldi (DevOps Architect) | `vivaldi-devops-architect` | Handoff + toolchain pins + CI docs |
+| Threat model, supply chain, secrets | Paganini (Security Analyst) | `paganini-security-analyst` | Handoff + spec sections |
+| ADR governance, compliance, waivers | Haydn (GRC Architect) | `haydn-grc-architect` | Handoff + ADR register + evidence manifests |
+| Documentation, session handouts | Schubert (Tech Writer) | `schubert-tech-writer` | Handoff + all task artifacts |
+| Visual design, UX, accessibility | Debussy (UX/UI Designer) | `debussy-ux-ui-designer` | Handoff + design reference + spec |
+| Post-phase analysis (4 roles) | Haydn / Ravel / Paganini / Vivaldi | same as above | Whole-phase artifacts |
+| Maintenance phase tasks | Per dispatch matrix | per task type | Standard handoff |
 
-### Review Agents (no handoff, need-to-know only)
+### Review Agents
 
-| Review Role | subagent_type | Receives | Phase |
-|---|---|---|---|
-| Blind adversarial review | `blind-hunter` | Spec + diff + tests only | Phase 1 (parallel) |
-| Edge case / boundary / deletion check | `edge-case-hunter` | Diff only | Phase 1 (parallel) |
-| Acceptance criteria audit | `acceptance-analyst` | Spec + diff | Phase 1 (parallel) |
-| Offensive security (STRIDE/OWASP) | `red-team-analyst` | Diff + spec context | Phase 2 (first) |
-| Defensive security (mitigations) | `blue-team-analyst` | Red team findings + diff | Phase 2 (second, after red team) |
+| Review Role | Agent | subagent_type | Receives | Phase |
+|---|---|---|---|---|
+| Blind adversarial review | Berlioz (Blind Hunter) | `berlioz-blind-hunter` | Spec + diff + tests | Phase 1 (parallel) |
+| Edge case / boundary / deletion | Bartók (Edge Case Hunter) | `bartok-edge-case-hunter` | Diff only | Phase 1 (parallel) |
+| Acceptance criteria audit | Verdi (Acceptance Analyst) | `verdi-acceptance-analyst` | Spec + diff | Phase 1 (parallel) |
+| Offensive security (STRIDE/OWASP) | Stravinsky (Red Team) | `stravinsky-red-team-analyst` | Diff + spec context | Phase 2 (first) |
+| Defensive security (mitigations) | Brahms (Blue Team) | `brahms-blue-team-analyst` | Red team findings + diff | Phase 2 (second) |
 
-**Critical rule:** Review agents NEVER receive the handoff file, author rationale, or
-conversation history. They review cold with need-to-know context only.
+**Critical rule:** Review agents NEVER receive the handoff file, author rationale,
+conversation history, the plan document, ADR context, or any indication of which
+agent did the work. They review cold with need-to-know context only.
 
 ---
 
@@ -49,40 +50,30 @@ conversation history. They review cold with need-to-know context only.
 
 ### 2.1 When to Create
 
-The orchestrator creates a handoff file BEFORE dispatching any production agent. For a task
-session, the file lives at:
-
-```
-.maestro-space/maestro-works/<phase>-<short-desc>/<task-id>-<short-desc>/handoff.md
-```
-
-Example: `.maestro-space/maestro-works/phase-1-delivery-system/p1-007-pr-template/handoff.md`
-
-For post-phase session: `.maestro-space/maestro-works/<phase>-<short-desc>/post-phase-<phase>/<role>-report.md`
+Bernstein creates a handoff file BEFORE dispatching any production agent. For a task
+session, the file lives in the task workspace folder. The exact path is determined
+per session from the phase plan.
 
 ### 2.2 Handoff File Structure
 
-The handoff file has YAML frontmatter conforming to `agent-output.schema.json` (canonical
-JSON schema at `.maestro-space/maestro-templates/agent-output.schema.json`) plus a markdown
-body. The required frontmatter shape for a task handoff is below; for post-phase
-session handoffs, see `maestro-templates/post-phase-*.md`.
+The handoff file has YAML frontmatter conforming to the agent-output JSON schema
+plus a markdown body.
 
 ```yaml
 ---
 change_id: "P1-007"
 phase: "Phase 1"
-task: "PR template with task/phase/capability/evidence fields"
-status: "in-progress"        # in-progress | review | coverage-audit | uat | done | blocked
-repository: "magalz/CandelaMoon"
-branch: "phase1/p1-007-pr-template"
+task: "<task description>"
+status: "in-progress"
+repository: "<org/repo>"
+branch: "<task-branch>"
 base_sha: "<40-char hex>"
 head_sha: ""
 pr_url: ""
 acceptance_criteria:
   - "<testable, atomic criterion>"
-  - "<testable, atomic criterion>"
 tdd_artifacts:
-  atdd_checklist: ".maestro-space/maestro-works/.../atdd-checklist.md"
+  atdd_checklist: "<path>"
   test_files: []
   red_phase_verified: false
 implementation_artifacts:
@@ -101,21 +92,16 @@ review_phase_2:
   triaged_findings: []
   fixes_applied: false
 coverage_audit:
-  rating: ""                  # pass | conditional-pass | fail
+  rating: ""
   risk_weighted_score: 0
   memtrace_reconciliation: ""
   coverage_gaps: []
 uat:
-  status: "pending"           # pending | passed | failed
+  status: "pending"
   user_decision: ""
 documentation:
   tech_writer_artifacts: []
-  session_handout: ".maestro-space/maestro-works/.../session-handout.md"
-memtrace_repo_id: "CandelaMoon"
-memtrace_indexed_sha: ""
-memtrace_episode_ids: []
-capability_rows: []
-adrs: []                      # ["0015", "0017", ...]
+  session_handout: "<path>"
 verification:
   tests_pass: false
   memtrace_review: false
@@ -127,17 +113,6 @@ verification:
 known_debt: []
 rollback_strategy: ""
 ---
-
-# Task: <one-line task statement>
-
-## Context
-[Orchestrator provides: task description, spec section reference, plan task reference, relevant ADRs]
-
-## Instructions for Agent
-[Orchestrator provides: concrete steps from the implementation plan, file paths, acceptance criteria]
-
-## Agent Output
-[Agent fills: files created/modified, evidence, deviations, known issues]
 ```
 
 ### 2.3 How Agents Update the Handoff
@@ -148,12 +123,10 @@ Each production agent, after completing its work:
 3. Updates `head_sha` with the current commit SHA
 4. Fills the markdown body's "Agent Output" section
 5. Notes any deviations from the plan or known issues
-6. Also writes a parallel `*.json` activity report next to the handoff, conforming to
-   `agent-output.schema.json` — this is the machine-parseable counterpart (Decision A: JSON+MD hybrid).
+6. Also writes a parallel JSON activity report (Decision A: JSON+MD hybrid).
 
-Review agents do NOT update the handoff. The orchestrator triages their findings and
-writes them into `review_phase_1` or `review_phase_2` sections. Reviewer findings are
-emitted as `findings-phase-N.json` + `findings-phase-N.md` files in the same task folder.
+Review agents do NOT update the handoff. Bernstein triages their findings and
+writes them into `review_phase_1` or `review_phase_2` sections.
 
 ---
 
@@ -162,93 +135,49 @@ emitted as `findings-phase-N.json` + `findings-phase-N.md` files in the same tas
 ### Production Agents
 
 Receive the full handoff file path and are instructed to read it. They also receive:
-- The spec path and relevant section (e.g., `docs/superpowers/specs/2026-08-05-candelamoon-roadmap-design.md` §X)
+- The spec path and relevant section from `/docs/`
 - The plan path and relevant task
-- The working directory path (the worktree)
+- The working directory path
 - Any relevant ADR IDs
-- The path to the activity report template (`.maestro-space/maestro-templates/agent-activity-report.md`)
+- The path to the activity report template
 
 ### Review Agents
 
 Receive ONLY:
 - The diff (or instructions to run `git diff` in the worktree)
-- The spec file path (for acceptance analyst and red team only)
-- The acceptance criteria (for acceptance analyst only)
-- Red team findings JSON (for blue team only)
+- The spec file path (for Verdi and Stravinsky only)
+- The acceptance criteria (for Verdi only)
+- Stravinsky's findings JSON (for Brahms only)
 
-They do NOT receive:
-- The handoff file path
-- Author rationale or conversation history
-- The plan document
-- ADR context
-- Any indication of which agent did the work
-- The session handout or post-phase reports
+They do NOT receive: the handoff, author rationale, conversation history, the plan,
+ADRs, or any indication of which agent did the work.
 
 ---
 
-## 4. Review Pipeline Orchestration
+## 4. Review Pipeline
 
-### Phase 1: Parallel Adversarial Review
+### Phase 1: Parallel
 
-Dispatch three review agents IN PARALLEL (single message, three task calls). Each gets
-the same diff but a different lens.
+Dispatch Berlioz, Bartók, and Verdi IN PARALLEL. Each gets the same diff but a
+different lens. If a subagent returns empty, retry once. If still empty, Bernstein
+performs the review directly.
 
-1. **Blind Hunter** (`subagent_type: "blind-hunter"`)
-   - Prompt: "Read the diff at [worktree path]. Run `git diff [base]..[head]` to see changes.
-     Find at least 10 issues. Return a numbered markdown list and a parallel findings JSON."
+### Triage
 
-2. **Edge Case Hunter** (`subagent_type: "edge-case-hunter"`)
-   - Prompt: "Read the diff at [worktree path]. Walk every branching path and boundary
-     condition. Return a JSON array of findings (per `agent-output.schema.json`)
-     and a parallel markdown narrative."
+Bernstein normalizes, deduplicates, assesses severity (low/medium/high), and routes:
+**decision-needed** → ask user; **patch** → send to Bach; **defer** → known debt;
+**dismiss** → noise / out-of-scope.
 
-3. **Acceptance Analyst** (`subagent_type: "acceptance-analyst"`)
-   - Prompt: "Read the spec at [spec path] section [section]. Read the diff at
-     [worktree path]. Check for deviations from acceptance criteria. Return a markdown
-     list of findings and a parallel findings JSON."
+### Phase 2: Sequential
 
-**If subagents return empty:** Retry once. If still empty, the orchestrator performs
-the review directly with the same methodology, noting that the subagent was unavailable
-in the handoff.
+1. Dispatch Stravinsky (Red Team). Wait for completion.
+2. Dispatch Brahms (Blue Team) with Stravinsky's findings as input.
+3. Bernstein triages security findings.
 
-### Triage (Orchestrator)
+### Delta-Only Re-Review
 
-After all Phase 1 reviews complete:
-1. Normalize all findings into a common format (id, source, title, detail, location)
-2. Deduplicate — merge findings describing the same issue
-3. Read the code at each finding location to assess real consequence
-4. Assign severity: low, medium, high
-5. Route: **decision-needed** (ask user), **patch** (send to developer), **defer**
-   (pre-existing or low-priority for follow-up), **dismiss** (noise / out-of-scope)
-6. Write triaged findings into handoff `review_phase_1.triaged_findings`
-7. If decision-needed findings exist, present to user before proceeding
-
-### Phase 2: Sequential Security Review
-
-Dispatch AFTER Phase 1 fixes are applied:
-
-1. **Red Team** (`subagent_type: "red-team-analyst"`)
-   - Prompt: "Review the diff at [worktree path] for exploitable security weaknesses.
-     Walk the security checklist (STRIDE, OWASP). Return a JSON array of findings
-     and a parallel markdown narrative."
-
-2. Wait for Red Team to complete.
-
-3. **Blue Team** (`subagent_type: "blue-team-analyst"`)
-   - Prompt: "Here are red team findings: [paste JSON]. Review the diff at
-     [worktree path]. Design concrete mitigations. Return a JSON array of
-     mitigations and a parallel markdown narrative."
-
-4. Triage security findings into handoff `review_phase_2.triaged_findings`.
-
-### Delta-Only Re-Review (Optimization)
-
-When the Senior Developer applies patches for a finding, the orchestrator may re-dispatch
-the **same** reviewer (e.g., blind-hunter) with the **delta** (the specific fix) and
-ask it to verify the patch addresses its original concern. To preserve reviewer context,
-the orchestrator passes the original `task_id` so the reviewer session resumes its prior
-context. This avoids re-running the entire 10+ issue review when the developer
-addressed one specific point.
+When Bach applies patches, Bernstein may re-dispatch the same reviewer with only the
+delta, using the original `task_id` to resume reviewer context.
 
 ---
 
@@ -260,8 +189,6 @@ When dispatching a production agent:
 subagent_type: "<agent-name from dispatch matrix>"
 
 prompt: |
-  You are working on the CandelaMoon project.
-  
   Handoff file: <path to handoff .md file>
   Read it first. It contains your task, acceptance criteria, and context.
   
@@ -270,15 +197,16 @@ prompt: |
   Plan: <plan path>, Task <N>
   Relevant ADRs: <ADR IDs>
   
-  Activity report template: .maestro-space/maestro-templates/agent-activity-report.md
-  JSON schema: .maestro-space/maestro-templates/agent-output.schema.json
+  Your agent identity and full operating rules are defined in your agent file.
+  Read it to understand your role, contract, and deliverables.
+  
+  Activity report template: <template path>
+  JSON schema: <schema path>
   
   After completing your work:
   1. Update the handoff file's implementation_artifacts section
   2. Set the status field
-  3. Write a parallel <agent>-activity-report.md AND <agent>-activity-report.json
-     in the same task folder. Both must conform to the activity-report template
-     and the JSON schema respectively.
+  3. Write a parallel activity report (JSON + MD) in the task folder.
 ```
 
 When dispatching a review agent:
@@ -288,59 +216,108 @@ subagent_type: "<review-agent-name>"
 
 prompt: |
   Review the changes in <worktree path>.
-  
   To see the diff, run: git diff <base_sha>..<head_sha>
   
-  [For blind-hunter]: Find at least 10 issues. Return a numbered markdown list
-  AND a parallel findings JSON conforming to agent-output.schema.json.
-  [For edge-case-hunter]: Walk every branching path. Return a JSON array of
-  findings and a parallel markdown narrative.
-  [For acceptance-analyst]: Check against spec at <path> section <N>. Return
-  a markdown list AND parallel JSON.
-  [For red-team-analyst]: Walk the security checklist. Return a JSON array of
-  findings and a parallel markdown narrative.
-  [For blue-team-analyst]: Here are red team findings: <JSON>. Design mitigations.
-  Return a JSON array of mitigations and a parallel markdown narrative.
+  [Agent-specific instructions here]
+  
+  Your agent identity and full operating rules are defined in your agent file.
   
   You do NOT have access to the handoff file, author rationale, or conversation history.
-  Write your findings to <worktree path>/.maestro-space/maestro-works/<phase>/<task>/findings-<phase>.{json,md}.
+  Write your findings to the task folder as findings-phase-<N>.{json,md}.
 ```
 
 ---
 
-## 6. Error Handling
+## 6. Session Start Protocols
 
-### Subagent returns empty
-Retry once. If still empty, orchestrator performs the review directly using the same
-methodology, noting the subagent was unavailable in the handoff.
+### 6.1 Phase Setup Session
 
-### Subagent crashes or times out
-Record the failure in the handoff. Retry with a simpler prompt. If repeated failures,
-orchestrator does the work directly.
+When starting a new phase, Bernstein follows `maestro-setup.md`:
+1. Read the global objectives and roadmap
+2. Read external `/docs/` context (spec, plans, ADRs, infrastructure)
+3. Create the phase folder and plan
+4. Create individual task files
+5. Create the phase workspace directory
+6. Update the roadmap
+7. Produce the setup handout → session ends
 
-### Memtrace/GitHub desynchronization
-Halt all development. Follow the repair mode protocol from spec section 7.2 and ADR 0013.
-No code changes until synchronization is restored.
+### 6.2 Task Session (Standard)
 
-### Memtrace MCP tools unavailable
-Record in handoff. Proceed with manual evidence (git diff, file listing). Flag for
-re-reconciliation when Memtrace is restored. Do NOT skip the coverage audit — use manual
-methods instead.
+When continuing an in-progress phase, Bernstein:
+1. Reads this guide
+2. Reads the session handout from the previous task session
+3. Checks git status, open PRs, CI state
+4. Sweeps handoffs for `status: in-progress` — resumes them first
+5. Checks Memtrace freshness against HEAD
+6. Reports the plan to the user → dispatches per the task
 
-### Reviewer context loss
-If a delta-only re-review needs the original reviewer's prior context, the orchestrator
-re-uses the original `task_id` from the previous dispatch so the reviewer session resumes.
+### 6.3 Post-Phase Session
+
+When all phase tasks are complete, Bernstein follows `maestro-post-phase.md`.
+
+### 6.4 Maintenance Phase Session
+
+After the post-phase session, Bernstein follows `maestro-maintenance.md`.
 
 ---
 
-## 7. Session Boundary (Hard Rule)
+## 7. Error Handling
 
-A **task session** ends when the PR is opened. The orchestrator MUST NOT continue work
-in the same session after the PR is created. The next session (which may be a new task
-session, a post-phase session, or a maintenance phase task) starts fresh, reads the
-session handout, and proceeds from the recorded state.
+- **Subagent returns empty**: Retry once. If still empty, Bernstein performs the review directly.
+- **Subagent crashes**: Record in handoff. Retry with simpler prompt. Fall back to direct work.
+- **Memtrace desync**: HALT all development. Follow repair mode protocol. No code changes until restored.
+- **Reviewer context loss**: Re-use the original `task_id` from the previous dispatch.
 
-This rule applies at every level:
-- Task session ends → PR opened → session terminates.
-- Post-phase session ends → 4 reports + summary + maintenance plan committed → session terminates.
-- Maintenance phase task session ends → PR opened → session terminates.
+---
+
+## 8. Phase Completion Sequence
+
+Bernstein tracks phase progress continuously through the phase plan:
+
+```
+1. Setup Session → Phase plan created, all tasks: Pending
+2. Task Sessions (N) → Task status: Pending → In Development → Completed
+3. All Tasks Completed → Trigger Post-Phase
+4. Post-Phase Complete → Trigger Maintenance Phase
+5. Maintenance Complete → Phase marked Completed → Next Phase may begin
+```
+
+### 8.1 Continuous Tracking (End of Every Session)
+
+Bernstein MUST update:
+1. **Individual task file**: Add Session History row (date, status, head SHA, PR URL, handoff path).
+2. **Phase plan**: Update task status in the Phase Tasks table.
+3. **Session handout**: Schubert produces this. Bernstein verifies it exists.
+
+### 8.2 Session Adjustments
+
+Decisions made during a session that affect future tasks must be propagated:
+1. **Dependency changes**: Update downstream task files and the phase plan.
+2. **Scope changes**: Update task description and affected downstream tasks.
+3. **New tasks**: Append with next available P-ID. Do not renumber existing tasks.
+4. **Deferred findings**: Record as `known_debt`. Review at post-phase time.
+5. **ADR decisions**: Reference in the task file and notify downstream tasks.
+
+### 8.3 Pre-Session State Check
+
+Before dispatching, Bernstein checks:
+- The phase plan for the next `Pending` task.
+- No `In Development` task exists (one task at a time).
+- The next task's dependencies are all `Completed`.
+- If a dependency is not `Completed`: HALT. Report to user.
+
+---
+
+## 9. Session Boundary (Hard Rule)
+
+A task session ends when the PR is opened. Bernstein MUST NOT continue work
+in the same session after the PR is created. The next session starts fresh,
+reads the session handout, and proceeds from the recorded state.
+
+---
+
+## 10. Paths
+
+The only hardcoded external path is `/docs/` for project documentation.
+All other paths (workspace, templates, handoffs, agent files) are acquired
+per session from the phase plan, session handout, or orchestrator configuration.

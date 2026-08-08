@@ -73,7 +73,7 @@ workflows, self-hosted runners, and the canary PR that proves all paths.
 **Exit gate**: a canary PR exercises every pipeline path (containerized + device +
 Windows + evidence + sync); branch protection enforces the gates; all four images
 are signed and published to GHCR; the design validator runs in CI.
-**Backlog**: `.maestro-space/maestro-plans/phase-1-delivery-system-backlog.md`
+**Backlog**: `.maestro-space/maestro-plans/phase-1-delivery-system/backlog.md`
 
 ### Phase 2+ — Product Phases (PLANNED)
 
