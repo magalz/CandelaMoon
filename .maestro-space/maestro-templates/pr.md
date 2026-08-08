@@ -10,7 +10,7 @@
 ## <task-id>: <one-line task statement>
 
 **Phase**: <Phase N>
-**Branch**: `<task branch>` → `moonlight-noir`
+**Branch**: `<task branch>` → `<default branch>`
 **Task ID**: `<task-id>`
 **Related ADRs**: `<id list>`
 

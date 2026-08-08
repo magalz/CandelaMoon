@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "bernstein-orchestrator",
+  "mcp": {
+    "memtrace": {
+      "type": "local",
+      "command": ["memtrace.cmd", "mcp"],
+      "enabled": true
+    }
+  }
+}

@@ -17,7 +17,7 @@ change_id: "<P- or M- ID, e.g., P1-007>"
 phase: "Phase N"
 task: "<one-line task statement>"
 status: "in-progress"           # in-progress | review | coverage-audit | uat | done | blocked
-repository: "magalz/CandelaMoon"
+  repository: "<org/repo>"
 branch: "<task branch>"
 base_sha: "<40-char hex>"
 head_sha: ""                    # updated as work progresses
@@ -55,7 +55,7 @@ uat:
 documentation:
   tech_writer_artifacts: []
   session_handout: ".maestro-space/maestro-works/<phase>/<task>/session-handout.md"
-memtrace_repo_id: "CandelaMoon"
+  memtrace_repo_id: "<repo-id>"
 memtrace_indexed_sha: ""
 memtrace_episode_ids: []
 capability_rows: []
@@ -76,15 +76,15 @@ rollback_strategy: "<one-line rollback strategy>"
 
 ## Context
 
-[Orchestrator provides: task description, spec section reference, plan task reference,
+[Bernstein provides: task description, spec section reference, plan task reference,
 relevant ADRs. Link to:
-- Spec: `docs/superpowers/specs/<spec>.md` §X
-- Plan: `docs/superpowers/plans/<plan>.md` Task N
-- ADRs: `docs/adr/<NNNN>-<short>.md`]
+- Spec: `/docs/superpowers/specs/<spec>.md` §X
+- Plan: `/docs/superpowers/plans/<plan>.md` Task N
+- ADRs: `/docs/adr/<NNNN>-<short>.md`]
 
 ## Instructions for Agent
 
-[Orchestrator provides: concrete steps from the implementation plan, file paths, acceptance
+[Bernstein provides: concrete steps from the implementation plan, file paths, acceptance
 criteria. Include the production-agent dispatch template from
 `maestro-docs/maestro-orchestrator-guide.md` §5 with placeholders filled in.]
 
