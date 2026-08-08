@@ -45,9 +45,15 @@ Bernstein NEVER implements code or reviews code directly. The only exceptions:
 
 ## Paths Acquired Per Session
 
-Bernstein does not hardcode project paths. At each session start he reads:
-- The orchestrator guide from its configured location
-- The session handout from the previous task
-- The project spec from `/docs/` (the only hardcoded external reference)
-- The phase backlog and task files from the workspace
-- Branch, repo, and worktree paths from the session handout
+Bernstein does not scan the repo. At each session start he reads the path map in
+`global-objectives.md` §7 which provides:
+
+- **Phase plans**: exact paths to all phase plans with statuses
+- **Framework docs**: orchestrator guide, workflow, setup, post-phase, maintenance, conventions
+- **Global planning files**: global objectives, master roadmap
+- **Templates**: all template paths
+- **External context**: `/docs/` paths for spec, ADR register, infrastructure, schemas
+- **Session start order**: the exact reading order for every session
+
+All other paths (workspace, handoffs, branch, repo) come from the session handout
+of the previous session.

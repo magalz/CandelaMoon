@@ -244,12 +244,14 @@ When starting a new phase, Bernstein follows `maestro-setup.md`:
 ### 6.2 Task Session (Standard)
 
 When continuing an in-progress phase, Bernstein:
-1. Reads this guide
-2. Reads the session handout from the previous task session
-3. Checks git status, open PRs, CI state
-4. Sweeps handoffs for `status: in-progress` — resumes them first
-5. Checks Memtrace freshness against HEAD
-6. Reports the plan to the user → dispatches per the task
+1. Reads `global-objectives.md` §7 for the path map — never scans the repo.
+2. Reads this guide.
+3. Reads the session handout from the previous task session.
+4. Reads the phase plan (path from §7) to find the next Pending task.
+5. Checks git status, open PRs, CI state.
+6. Sweeps handoffs for `status: in-progress` — resumes them first.
+7. Checks Memtrace freshness against HEAD.
+8. Reports the plan to the user → dispatches per the task.
 
 ### 6.3 Post-Phase Session
 

@@ -63,7 +63,9 @@ The program organizes work into phases. Each phase:
 **Exit gate**: spec, plan, design validator, agent architecture, and dual evidence
 manifest schemas are committed and pass validation.
 
-**Status**: complete (per `docs/superpowers/plans/2026-08-05-phase0-delivery-system-design.md`).
+**Status**: complete.
+
+**Phase plan**: `.maestro-space/maestro-plans/phase-0-delivery-system/phase-plan.md`
 
 ### Phase 1 — Delivery System (IN PROGRESS)
 
@@ -73,18 +75,17 @@ workflows, self-hosted runners, and the canary PR that proves all paths.
 **Exit gate**: a canary PR exercises every pipeline path (containerized + device +
 Windows + evidence + sync); branch protection enforces the gates; all four images
 are signed and published to GHCR; the design validator runs in CI.
-**Backlog**: `.maestro-space/maestro-plans/phase-1-delivery-system/backlog.md`
+
+**Status**: In Progress (1/21 tasks completed: P1-021).
+**Phase plan**: `.maestro-space/maestro-plans/phase-1-delivery-system/phase-plan.md`
+**Next pending**: P1-001 (candelamoon-android Containerfile).
 
 ### Phase 2+ — Product Phases (PLANNED)
 
 The post-Phase 1 phases will be defined after the Phase 1 post-phase report and
-maintenance phase complete. Phase 2 candidates (illustrative, not yet committed):
-- Architecture spine hardening (capability contract, evidence manifests per surface)
-- UI modernization (Compose for TV evaluation, design system, accessibility)
-- Protocol integration tests (LuminalShine contract fixtures)
-- TV-only form factor migration (mobile behavior removal)
-- Decoder / device / performance work
-- Release engineering (signing, provenance, store-ready builds)
+maintenance phase complete.
+
+**Phase 2 plan (stub)**: `.maestro-space/maestro-plans/phase-2-repositories-and-baselines/phase-plan.md`
 
 ## 5. Cross-Phase Principles
 
@@ -124,3 +125,55 @@ the framework's own conventions.
 - The product can be installed, paired, browsed, launched, streamed, controlled,
   recovered, and disconnected on every supported API tier
 - The post-phase + maintenance discipline holds across all phase boundaries
+
+## 7. Bernstein Path Configuration
+
+> Read at session start so Bernstein knows where everything is without scanning.
+
+### Phase Plans (ordered by execution)
+
+| Phase | Status | Plan File | Workspace |
+|---|---|---|---|
+| 0 | Complete | `.maestro-space/maestro-plans/phase-0-delivery-system/phase-plan.md` | `.maestro-space/maestro-works/phase-0-delivery-system/` |
+| 1 | In Progress | `.maestro-space/maestro-plans/phase-1-delivery-system/phase-plan.md` | `.maestro-space/maestro-works/phase-1-delivery-system/` |
+| 2 | Pending | `.maestro-space/maestro-plans/phase-2-repositories-and-baselines/phase-plan.md` | `.maestro-space/maestro-works/phase-2-repositories-and-baselines/` |
+
+### Framework Documents
+
+| Document | Path |
+|---|---|
+| Orchestrator guide | `.maestro-space/maestro-docs/maestro-orchestrator-guide.md` |
+| Workflow | `.maestro-space/maestro-docs/maestro-workflow.md` |
+| Setup guide | `.maestro-space/maestro-docs/maestro-setup.md` |
+| Post-phase guide | `.maestro-space/maestro-docs/maestro-post-phase.md` |
+| Maintenance guide | `.maestro-space/maestro-docs/maestro-maintenance.md` |
+| Conventions | `.maestro-space/maestro-docs/maestro-conventions.md` |
+| Agent registry | `.maestro-space/maestro-agents/agent-manifest.json` |
+| Templates | `.maestro-space/maestro-templates/` |
+
+### Global Planning Files
+
+| Document | Path |
+|---|---|
+| Global objectives | `.maestro-space/maestro-plans/global-objectives.md` |
+| Master roadmap | `.maestro-space/maestro-plans/master-roadmap.md` |
+
+### External Context (`/docs/`)
+
+| Resource | Path |
+|---|---|
+| Spec | `docs/superpowers/specs/2026-08-05-candelamoon-roadmap-design.md` |
+| ADR register | `docs/adr/` |
+| Infrastructure docs | `docs/infrastructure/` |
+| Schemas | `docs/schema/` |
+
+### Session Start Order for Bernstein
+
+1. Read this file (`global-objectives.md`) for the path map.
+2. Read the orchestrator guide for dispatch rules.
+3. Find the current phase from the table above.
+4. Read the phase plan to find the next Pending task.
+5. Read the task file for details and dependencies.
+6. Read the session handout from the previous session (in the workspace).
+7. Check git status, open PRs, CI state.
+8. Report plan to user. Dispatch.
