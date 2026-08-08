@@ -38,3 +38,5 @@ Without an exit gate, work flows straight from development to UAT with no verifi
 ### Coverage Audit Without Memtrace
 
 An audit that cannot reconcile what changed versus what was documented misses gaps where tests and documentation describe different surfaces. Rejected.
+
+**Framework reference**: This ADR is operationalized in .maestro-space/maestro-docs/maestro-orchestrator-guide.md §5 step 10 (Coverage Audit) and .maestro-space/maestro-templates/coverage-audit.md (the audit template). Every task's coverage audit is recorded at .maestro-space/maestro-works/<phase>/<task>/coverage-audit.{md,json}.

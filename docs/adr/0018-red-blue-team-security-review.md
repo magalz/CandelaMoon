@@ -38,3 +38,5 @@ An offensive pass alone finds weaknesses but produces no fixes, leaving the deve
 ### Only Defensive Review
 
 A defensive pass alone is less creative at discovering attacks, so the surface is explored from only one direction. Rejected.
+
+**Framework reference**: This ADR is operationalized in .maestro-space/maestro-docs/maestro-orchestrator-guide.md §4 (Phase 2: Sequential Security Review) and the post-phase templates in .maestro-space/maestro-templates/post-phase-{grc,qa,security,devops,summary}.md.

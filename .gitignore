@@ -52,4 +52,11 @@ AGENTS.md
 .memtrace/
 new-design/
 __pycache__/
-docs/handoffs/
+
+# Note: .maestro-space/ is TRACKED (per the restructure in PR
+# "docs(maestro-space): restructure to tracked .maestro-space/ framework").
+# The workflow-secrets subdirectory (.maestro-space/maestro-secrets/) is the only
+# part of .maestro-space/ that remains ignored — that exclusion is enforced by
+# .maestro-space/.gitignore (the internal defensive marker).
+# docs/handoffs/ is no longer used; legacy framework artifacts now live under
+# .maestro-space/maestro-works/<phase>/<task>/.

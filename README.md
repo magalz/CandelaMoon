@@ -82,3 +82,29 @@ The main repo had stayed silent for 5 months, with nobody actually responding to
 
 Moonlight is the work of students at [Case Western](http://case.edu) and was
 started as a project at [MHacks](http://mhacks.org).
+
+---
+
+## CandelaMoon
+
+This repository is being transformed from Artemis/Moonlight-Android into
+**CandelaMoon** — a TV-only Android client tailored to official LuminalShine
+releases. See `docs/superpowers/specs/2026-08-05-candelamoon-roadmap-design.md`
+for the approved design and `docs/adr/` for the 20 ADRs that capture the
+decisions.
+
+### How we work
+
+The development workflow is operationalized in the tracked `.maestro-space/`
+framework. See:
+
+- `.maestro-space/index.md` — framework entry point
+- `.maestro-space/maestro-docs/maestro-orchestrator-guide.md` — dispatch matrix, handoff protocol, review pipeline
+- `.maestro-space/maestro-docs/maestro-workflow.md` — 14-step task cycle, post-phase, maintenance
+- `.maestro-space/maestro-docs/maestro-conventions.md` — JSON+MD output, naming, agent contracts
+- `.maestro-space/maestro-plans/master-roadmap.md` — the program roadmap
+- `.maestro-space/maestro-agents/agent-manifest.json` — the agent registry
+
+To run a task: read `.maestro-space/maestro-docs/maestro-orchestrator-guide.md`,
+create a handoff at `.maestro-space/maestro-works/<phase>/<task>/handoff.md`,
+and follow the 14-step cycle.

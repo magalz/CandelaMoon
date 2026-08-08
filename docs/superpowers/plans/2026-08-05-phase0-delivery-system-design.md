@@ -527,3 +527,18 @@ Create a draft PR titled `docs: Phase 0 — Delivery-System Design (phase audit)
 **2. Placeholder scan:** TBD/TODO/fill-in checked and confirmed resolved. All 20 ADRs have concrete decisions with spec references per Step 2 of Task 3. Schemas have concrete fields with defined types and enums. Implementation backlog has 20 concrete items with IDs.
 
 **3. Type consistency:** ADR schema id field uses ^\d{4}$ pattern; all ADR files follow 0001-0020 format. Evidence manifest base_sha/head_sha use ^[0-9a-f]{7,40}$. Capability-row domain enum has 12 entries matching spec section 4.3. Device-matrix platform_tier enum matches ADR 0007 tiers.
+---
+
+## Post-Restructure Note (2026-08-07)
+
+This plan was executed in Phase 0 and produced the artifacts at their original locations (docs/adr/, docs/infrastructure/, docs/schema/, scripts/validate_design.py). After the interphase/maestro-space-bootstrap PR (PR #7) and the subsequent .maestro-space/ restructure, the framework-owned artifacts moved to:
+
+- docs/infrastructure/implementation-backlog.md (the Phase 1 backlog) → .maestro-space/maestro-plans/phase-1-delivery-system-backlog.md
+- docs/infrastructure/orchestrator-guide.md (the framework orchestrator guide) → .maestro-space/maestro-docs/maestro-orchestrator-guide.md
+- docs/infrastructure/session-handout-phase0.md (the Phase 0 session handout) → .maestro-space/maestro-works/phase-0-delivery-system/post-phase-0/session-handout.md
+- docs/handoffs/* (per-task handoffs) → .maestro-space/maestro-works/<phase>/<task>/handoff.md
+- docs/audits/* (per-task coverage audits) → .maestro-space/maestro-works/<phase>/<task>/coverage-audit.md
+
+The phase deliverables themselves (ADRs, schemas, infra design docs, scripts) remain at their original docs/ locations — they are product documentation, not framework.
+
+See .maestro-space/maestro-plans/phase-0-delivery-system-backlog.md for the retrofitted Phase 0 backlog in the new format, and .maestro-space/maestro-plans/master-roadmap.md for the full program roadmap.

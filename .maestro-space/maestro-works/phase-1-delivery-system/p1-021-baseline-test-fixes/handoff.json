@@ -1,0 +1,92 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "handoff",
+  "agent": {
+    "name": "Orchestrator (with QA Architect, Senior Developer, Tech Writer inputs)",
+    "role": "Product Owner / Phase 1 task handoff",
+    "subagent_type": "product-owner",
+    "dispatched_by": "candelamoon-orchestrator",
+    "task_id": "P1-021"
+  },
+  "task": {
+    "change_id": "P1-021",
+    "phase": "Phase 1",
+    "phase_short": "phase-1-delivery-system",
+    "branch": "phase1/p1-021-baseline-test-fixes",
+    "base_sha": "53659407e185a4629bf9654a14f0f39b2c5c38c0",
+    "head_sha": "584dc970996b4a1557b2a808a25afebe40464e7c",
+    "pr_url": "https://github.com/magalz/CandelaMoon/pull/6"
+  },
+  "data": {
+    "title": "Fix baseline unit test failures surfaced by Phase 0 CI",
+    "task_statement": "Fix pre-existing Android unit-test failures (LayoutInflationTest, SimpleStartupTest, StartupCrashTest) first surfaced by the Phase 0 CI run on PR #3.",
+    "acceptance_criteria": [
+      "LayoutInflationTest.allLayoutsInflateSuccessfully passes without an InflateException.",
+      "SimpleStartupTest.testApplicationOnCreate passes without a null-base Context failure.",
+      "StartupCrashTest.testUiHelperCrash passes without a null-base Context failure.",
+      "./gradlew testNonRoot_gameDebugUnitTest, or the equivalent CI test job, is green.",
+      "The repair preserves API 28 compatibility and does not weaken production startup or layout behavior."
+    ],
+    "tdd_artifacts": {
+      "atdd_checklist": ".maestro-space/maestro-works/phase-1-delivery-system/p1-021-baseline-test-fixes/atdd-checklist.md",
+      "red_phase_verified": true,
+      "test_files": [
+        "app/src/test/java/com/limelight/LayoutInflationTest.java#allLayoutsInflateSuccessfully",
+        "app/src/test/java/com/limelight/SimpleStartupTest.java#testApplicationOnCreate",
+        "app/src/test/java/com/limelight/StartupCrashTest.java#testUiHelperCrash"
+      ]
+    },
+    "implementation_artifacts": {
+      "files_created": [
+        "app/src/test/java/com/limelight/MaterialFabCompatTest.java"
+      ],
+      "files_modified": [
+        "app/src/main/java/com/limelight/ArtemisApplication.java",
+        "app/src/main/res/values/styles.xml",
+        "app/src/main/res/layout/activity_app_view.xml",
+        "app/src/main/res/layout/activity_pc_view.xml",
+        "app/src/main/res/layout-land/activity_pc_view.xml",
+        "app/src/main/res/layout/activity_profiles.xml",
+        "app/src/test/java/com/limelight/SimpleStartupTest.java",
+        "app/src/test/java/com/limelight/profiles/ProfilesNavigationTest.java",
+        ".github/workflows/open-pr-bot.yml"
+      ],
+      "green_phase_verified": true
+    },
+    "review_phase_1": {
+      "blind_hunter_findings_count": 18,
+      "edge_case_hunter_findings_count": 3,
+      "acceptance_analyst_findings_count": 3,
+      "triaged_findings_count": 6,
+      "fixes_applied": true
+    },
+    "review_phase_2": {
+      "red_team_clean": true,
+      "blue_team_clean": true,
+      "fixes_applied": false
+    },
+    "coverage_audit": {
+      "rating": "pass",
+      "risk_weighted_score": 50,
+      "max_score": 50,
+      "audit_document": ".maestro-space/maestro-works/phase-1-delivery-system/p1-021-baseline-test-fixes/coverage-audit.md"
+    },
+    "uat": {
+      "status": "passed",
+      "user_decision": "UAT not applicable — evidence accepted."
+    },
+    "adrs": ["0014", "0016", "0019", "0020"],
+    "verification": {
+      "tests_pass": true,
+      "memtrace_review": true,
+      "acceptance_audit": true,
+      "edge_case_hunt": true,
+      "blind_hunt": true,
+      "security_review": true,
+      "policy_check": true
+    }
+  },
+  "emitted_at": "2026-08-07T21:14:26Z",
+  "narrative_path": ".maestro-space/maestro-works/phase-1-delivery-system/p1-021-baseline-test-fixes/handoff.md",
+  "notes": "JSON mirror of the handoff.md frontmatter, conforming to .maestro-space/maestro-templates/agent-output.schema.json. Final commit 584dc970 is workflow-only; the source-code head is 0aa9b711 (graph unchanged). PR #6 MERGED."
+}

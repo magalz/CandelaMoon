@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "coverage-audit",
+  "agent": {
+    "name": "QA Architect",
+    "role": "Coverage audit and Memtrace reconciliation (ADR 0019)",
+    "subagent_type": "qa-architect",
+    "task_id": "P1-021"
+  },
+  "task": {
+    "change_id": "P1-021",
+    "phase": "Phase 1",
+    "phase_short": "phase-1-delivery-system",
+    "branch": "phase1/p1-021-baseline-test-fixes",
+    "base_sha": "53659407e185a4629bf9654a14f0f39b2c5c38c0",
+    "head_sha": "0aa9b711a4cdb215ce331831b17f455d6c8ee868"
+  },
+  "data": {
+    "rating": "pass",
+    "risk_weighted_score": 50,
+    "max_score": 50,
+    "percentage": 100,
+    "ac_coverage": [
+      { "ac": 1, "scenario": "LayoutInflationTest.allLayoutsInflateSuccessfully passes without InflateException", "tests": ["LayoutInflationTest.allLayoutsInflateSuccessfully (SDK 33)", "MaterialFabCompatTest (4 methods x 4 SDKs)"], "status": "COVERED", "evidence": "green at 68/68" },
+      { "ac": 2, "scenario": "SimpleStartupTest.testApplicationOnCreate passes without null-base Context failure", "tests": ["SimpleStartupTest.testApplicationOnCreate (direct-construction)", "SimpleStartupTest.testApplicationOnCreateLoadsProfilesWhenAttached (attached-lifecycle)"], "status": "COVERED" },
+      { "ac": 3, "scenario": "StartupCrashTest.testUiHelperCrash passes without null-base Context failure", "tests": ["StartupCrashTest.testUiHelperCrash"], "status": "COVERED (no production change needed; Robolectric attaches base)" },
+      { "ac": 4, "scenario": "testNonRoot_gameDebugUnitTest is green", "tests": ["Full suite 68/68 PASS"], "status": "COVERED" },
+      { "ac": 5, "scenario": "Preserves API 28 compatibility; does not weaken production startup or layout behavior", "tests": ["MaterialFabCompatTest SDK 28/29/30/33 matrix", "testApplicationOnCreateLoadsProfilesWhenAttached", "ProfilesNavigationTest"], "status": "COVERED" }
+    ],
+    "review_triage_verification": [
+      { "id": "PH1-001", "severity": "high", "route": "patch", "verified": true },
+      { "id": "PH1-002", "severity": "high", "route": "patch", "verified": true },
+      { "id": "PH1-003", "severity": "medium", "route": "patch", "verified": true },
+      { "id": "PH1-004", "severity": "low", "route": "patch", "verified": true },
+      { "id": "PH1-005", "severity": "low", "route": "defer", "verified": "DEFERRED" },
+      { "id": "PH1-006", "severity": null, "route": "dismiss", "verified": "DISMISSED (out-of-scope)" },
+      { "id": "SEC-001", "severity": "info", "route": "no patch", "verified": "CONFIRMED" }
+    ],
+    "memtrace_reconciliation": {
+      "indexed_sha": "0aa9b711a4cdb215ce331831b17f455d6c8ee868",
+      "branch": "phase1/p1-021-baseline-test-fixes",
+      "nodes": 21029,
+      "edges": 84841,
+      "detect_changes": "4 changed files, 0 unexpected affected symbols",
+      "get_timeline_ArtemisApplication_onCreate": "7 versions; final ast_hash 367796489c2397ea (load(this) always runs, only Toast guarded)",
+      "get_evolution_episodes": 14,
+      "conclusion": "clean (no undocumented changes, no drift, no reverted attempts shipped)"
+    },
+    "coverage_gaps": [
+      "JaCoCo line-coverage report not generated (containerized test runs did not invoke jacocoTestReport; bare host has no Android SDK). Not a coverage gap — static mapping confirms every changed symbol is tested. Follow-up: add jacocoTestReport to the CI test job.",
+      "PH1-005 (deferred): LayoutInflationTest pre-existing retry behavior; outside changed files."
+    ],
+    "minor_narrative_discrepancy": "Handoff review-focused run claims '20/20 PASSED' but review-focused2.log shows 24 PASSED. Arithmetic error in the handoff narrative, not in the test suite. The build is green and all claimed tests pass. Does not affect the coverage rating."
+  },
+  "emitted_at": "2026-08-07T19:17:20Z",
+  "narrative_path": ".maestro-space/maestro-works/phase-1-delivery-system/p1-021-baseline-test-fixes/coverage-audit.md"
+}

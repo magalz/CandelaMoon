@@ -1,0 +1,86 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "session-handout",
+  "agent": {
+    "name": "Tech Writer (with Orchestrator + Senior Developer inputs)",
+    "role": "Session handout for context continuity (ADR 0020)",
+    "subagent_type": "tech-writer",
+    "task_id": "P1-021"
+  },
+  "task": {
+    "change_id": "P1-021",
+    "phase": "Phase 1",
+    "phase_short": "phase-1-delivery-system",
+    "branch": "phase1/p1-021-baseline-test-fixes",
+    "base_sha": "53659407e185a4629bf9654a14f0f39b2c5c38c0",
+    "head_sha": "584dc970996b4a1557b2a808a25afebe40464e7c",
+    "pr_url": "https://github.com/magalz/CandelaMoon/pull/6"
+  },
+  "data": {
+    "title": "P1-021 Baseline Test Fixes",
+    "date": "2026-08-07",
+    "current_state": {
+      "branch": "phase1/p1-021-baseline-test-fixes",
+      "head_sha": "584dc970996b4a1557b2a808a25afebe40464e7c",
+      "head_sha_note": "workflow-only commit; source-code head is 0aa9b711",
+      "base_sha": "53659407e185a4629bf9654a14f0f39b2c5c38c0",
+      "pr_url": "https://github.com/magalz/CandelaMoon/pull/6",
+      "pr_state": "MERGED",
+      "pr_merged_at": "2026-08-07T21:14:26Z",
+      "merge_commit": "e952b09e93e061b5afb1ef8b015b9dc15282559c",
+      "memtrace_indexed_sha": "0aa9b711a4cdb215ce331831b17f455d6c8ee868",
+      "memtrace_indexed_branch": "phase1/p1-021-baseline-test-fixes",
+      "memtrace_nodes": 21029,
+      "memtrace_edges": 84841,
+      "handoff_status": "done",
+      "uat_status": "passed"
+    },
+    "completed_evidence": [
+      { "gate": "Red phase (ADR 0016)", "result": "22 tests, 2 failed (predicted)", "evidence": "ATDD checklist; red-phase.log" },
+      { "gate": "Green phase (focused)", "result": "22/22 PASS", "evidence": "green-focused2.log" },
+      { "gate": "Green phase (full suite)", "result": "68/68 PASS in 1m 45s (51 baseline + 16 API-tier matrix + 1 attached-lifecycle)", "evidence": "review-green-full-final.log" },
+      { "gate": "Base comparison", "result": "51 tests, 5 failed -> 68 tests, 0 failed", "evidence": "base-full.log" },
+      { "gate": "Review Phase 1", "result": "6 triaged findings (PH1-001..PH1-006); PH1-001/002/003/004 patched", "evidence": "Handoff review_phase_1" },
+      { "gate": "Review Phase 2 (security)", "result": "SEC-001 info, no actionable issue", "evidence": "Handoff review_phase_2" },
+      { "gate": "Coverage audit (ADR 0019)", "result": "PASS, risk-weighted 50/50, Memtrace clean", "evidence": "coverage-audit.md" },
+      { "gate": "UAT", "result": "passed (evidence accepted)", "evidence": "Handoff uat" },
+      { "gate": "git diff --check", "result": "clean (5 XML files LF-normalized for PH1-004)", "evidence": "working tree" },
+      { "gate": "Workflow repair", "result": "584dc970", "evidence": ".github/workflows/open-pr-bot.yml bound create-pr to maestro environment" },
+      { "gate": "open-pr-bot workflow run", "result": "31218847192 succeeded; PR #6 created", "evidence": "GitHub Actions" },
+      { "gate": "Memtrace GitHub PR review", "result": "0 comments posted, sourceCounts ast=2/cross_module=1/online=0/yaml=0", "evidence": "PR #6 review preview" }
+    ],
+    "artifacts_produced": [
+      { "path": "app/src/main/java/com/limelight/ArtemisApplication.java", "tracked": true },
+      { "path": "app/src/main/res/values/styles.xml", "tracked": true },
+      { "path": "app/src/main/res/layout/activity_app_view.xml", "tracked": true },
+      { "path": "app/src/main/res/layout/activity_pc_view.xml", "tracked": true },
+      { "path": "app/src/main/res/layout-land/activity_pc_view.xml", "tracked": true },
+      { "path": "app/src/main/res/layout/activity_profiles.xml", "tracked": true },
+      { "path": "app/src/test/java/com/limelight/MaterialFabCompatTest.java", "tracked": true },
+      { "path": "app/src/test/java/com/limelight/SimpleStartupTest.java", "tracked": true },
+      { "path": "app/src/test/java/com/limelight/profiles/ProfilesNavigationTest.java", "tracked": true },
+      { "path": ".maestro-space/maestro-works/phase-1-delivery-system/p1-021-baseline-test-fixes/handoff.md", "tracked": true },
+      { "path": ".maestro-space/maestro-works/phase-1-delivery-system/p1-021-baseline-test-fixes/atdd-checklist.md", "tracked": true },
+      { "path": ".maestro-space/maestro-works/phase-1-delivery-system/p1-021-baseline-test-fixes/coverage-audit.md", "tracked": true },
+      { "path": ".maestro-space/maestro-works/phase-1-delivery-system/p1-021-baseline-test-fixes/session-handout.md", "tracked": true },
+      { "path": ".maestro-space/maestro-plans/phase-1-delivery-system-backlog.md", "tracked": true, "note": "P1-021 marked COMPLETE; P1-001 NEXT PENDING" }
+    ],
+    "pending_work": [
+      "Begin P1-001 (next pending Phase 1 work item). Create the official infra/containers/candelamoon-android/Containerfile. Local dev build Containerfile preserved at %TEMP%/opencode/p1-021/Containerfile. Dependencies: none. Complexity: M. Related ADR: 0014."
+    ],
+    "known_debt": [
+      { "id": "PH1-005", "severity": "low", "item": "LayoutInflationTest pre-existing retry behavior (catch InflateException -> retry with FrameLayout) weakens diagnostic evidence for <merge> root layouts; outside changed files, not required for P1-021 green", "resolution": "Follow-up task (do not expand P1-021 scope)" },
+      { "id": "DOC-001", "severity": "low", "item": "Narrative discrepancy: review-focused run claimed 20/20 but log shows 24. Arithmetic error in narrative, not in test suite. The standalone coverage audit records the correct count (24).", "resolution": "No code/test change required; documentation-only debt" },
+      { "id": "DOC-002", "severity": "low", "item": "JaCoCo line-coverage report not generated (containerized test runs did not invoke jacocoTestReport; bare host has no Android SDK). Not a coverage gap — static mapping confirms every changed symbol is tested.", "resolution": "Add jacocoTestReport to the CI test job in a future infra task (P1-010/P1-011 territory)" },
+      { "id": "DOC-004", "severity": "low", "item": "The candelamoon-android image used for the containerized test runs is a local dev build of the CI-equivalent toolchain (Containerfile preserved at %TEMP%/opencode/p1-021/Containerfile). The official infra/containers/candelamoon-android/Containerfile is P1-001 territory.", "resolution": "Resolved by P1-001" }
+    ],
+    "memtrace_episode_ids": [
+      "4ad065db-d367-44e6-b0a9-dd64c2d79b53",
+      "b6b5726b-56ab-46ad-b5b9-29c0e6f1817c",
+      "5b923d4e-444c-4c70-95d5-74513de14fa2",
+      "6666fd06-14c6-4bc6-b5cf-0133f967e240"
+    ]
+  },
+  "emitted_at": "2026-08-07T18:19:20Z",
+  "narrative_path": ".maestro-space/maestro-works/phase-1-delivery-system/p1-021-baseline-test-fixes/session-handout.md"
+}

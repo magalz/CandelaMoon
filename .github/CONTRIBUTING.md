@@ -63,6 +63,23 @@ When using AI tools to generate code:
 
 Please refer to the README.md file for instructions on setting up your development environment.
 
+## CandelaMoon Development Workflow
+
+All work follows the per-task 14-step cycle defined in
+`.maestro-space/maestro-docs/maestro-workflow.md`. The orchestrator (acting as
+Product Owner) dispatches specialized agents via the dispatch matrix in
+`.maestro-space/maestro-docs/maestro-orchestrator-guide.md`. Every task has a
+handoff at `.maestro-space/maestro-works/<phase>/<task>/handoff.md` and ends
+with a session handout, a coverage audit (PASS required), and a PR opened by
+the `candelamoon-bot` workflow.
+
+**Before starting any task, read**:
+- `.maestro-space/index.md` (framework entry point)
+- `.maestro-space/maestro-docs/maestro-orchestrator-guide.md` (dispatch + handoff protocol)
+- `.maestro-space/maestro-docs/maestro-workflow.md` (14-step cycle)
+- `.maestro-space/maestro-plans/master-roadmap.md` (program roadmap; identifies next pending work)
+- `.maestro-space/maestro-plans/phase-N-<short>-backlog.md` (per-phase task list)
+
 ## Questions?
 
 If you have questions about contributing, feel free to:

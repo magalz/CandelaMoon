@@ -15,7 +15,7 @@
 - **Plan:** Phase 0 plan at `docs/superpowers/plans/2026-08-05-phase0-delivery-system-design.md`
 - **Phase 0:** Complete. All 9 tasks done + orchestrator guide. Exit gate met. PR #2 is draft.
 - **Phase 1:** Not started. Implementation backlog has 20 work items (P1-001 through P1-020).
-- **Orchestrator guide:** `docs/infrastructure/orchestrator-guide.md` — defines agent dispatch matrix, handoff file protocol, context scoping, review pipeline, and 14-step task execution flow. From Phase 1 onward, all tasks use specialized agents via `subagent_type` and follow the handoff protocol.
+- **Orchestrator guide:** `.maestro-space/maestro-docs/maestro-orchestrator-guide.md` — defines agent dispatch matrix, handoff file protocol, context scoping, review pipeline, and 14-step task execution flow. From Phase 1 onward, all tasks use specialized agents via `subagent_type` and follow the handoff protocol.
 - **Memtrace:** CandelaMoon repo indexed on branch `docs/phase0-delivery-system-design`
 - **LuminalShine mirror:** Remote configured (origin → magalz/luminalshine-mirror, upstream → NortheBridge/luminalshine, push disabled)
 - **Agents:** 12 agents configured in `.opencode/agents/`
@@ -43,15 +43,15 @@
 | `docs/infrastructure/secrets-and-signing-policy.md` | Secrets and signing policy |
 | `docs/infrastructure/incident-and-rollback-policy.md` | Incident response and rollback |
 | `docs/infrastructure/retention-cache-cost-maintenance-policy.md` | Retention, cache, cost, maintenance |
-| `docs/infrastructure/implementation-backlog.md` | Phase 1 backlog (20 items) |
+| `.maestro-space/maestro-plans/phase-1-delivery-system-backlog.md` | Phase 1 backlog (20 items) |
 | `docs/infrastructure/phase0-audit.md` | Phase 0 audit and review evidence |
-| `docs/infrastructure/orchestrator-guide.md` | Orchestrator dispatch matrix + handoff protocol |
-| `docs/infrastructure/session-handout-phase0.md` | This file |
+| `.maestro-space/maestro-docs/maestro-orchestrator-guide.md` | Orchestrator dispatch matrix + handoff protocol |
+| `.maestro-space/maestro-works/phase-0-delivery-system/post-phase-0/session-handout.md` | This file |
 | `.opencode/agents/*.md` | 12 agent configuration files |
 
 ## Pending Work
 
-Phase 1 (Delivery Foundation) — 20 work items in `docs/infrastructure/implementation-backlog.md`. Each task follows the 14-step pipeline defined in `docs/infrastructure/orchestrator-guide.md`, using specialized agents via `subagent_type` and handoff files in `docs/handoffs/`.
+Phase 1 (Delivery Foundation) — 20 work items in `.maestro-space/maestro-plans/phase-1-delivery-system-backlog.md`. Each task follows the 14-step pipeline defined in `.maestro-space/maestro-docs/maestro-orchestrator-guide.md`, using specialized agents via `subagent_type` and handoff files in `.maestro-space/maestro-works/<phase>/<task>/`.
 1. Create 4 Podman Containerfiles
 2. Build and publish images to GHCR with signatures
 3. Configure GitHub branch protection
@@ -70,8 +70,8 @@ Phase 1 (Delivery Foundation) — 20 work items in `docs/infrastructure/implemen
 - **Spec:** `docs/superpowers/specs/2026-08-05-candelamoon-roadmap-design.md`
 - **Plan:** `docs/superpowers/plans/2026-08-05-phase0-delivery-system-design.md`
 - **ADR register:** `docs/adr/` (20 ADRs)
-- **Implementation backlog:** `docs/infrastructure/implementation-backlog.md`
-- **Orchestrator guide:** `docs/infrastructure/orchestrator-guide.md` — dispatch matrix, handoff protocol, review pipeline
+- **Implementation backlog:** `.maestro-space/maestro-plans/phase-1-delivery-system-backlog.md`
+- **Orchestrator guide:** `.maestro-space/maestro-docs/maestro-orchestrator-guide.md` — dispatch matrix, handoff protocol, review pipeline
 - **Phase 0 audit:** `docs/infrastructure/phase0-audit.md`
 - **Validator:** `scripts/validate_design.py` (run with `--strict`)
 - **Worktree:** `C:\Users\magal\AppData\Local\Temp\opencode\candelamoon-roadmap-design` on branch `docs/phase0-delivery-system-design`
@@ -100,3 +100,25 @@ Both PRs are draft. To undo Phase 0 work:
 1. Close PR #2 and delete branch `docs/phase0-delivery-system-design`
 2. Close PR #1 and delete branch `docs/roadmap-design`
 3. The `moonlight-noir` branch is untouched — all work was on separate branches in a worktree
+
+## Completed Evidence (Phase 0 audit, equivalent)
+
+| Gate | Result | Evidence |
+|---|---|---|
+| Validator (scripts/validate_design.py --strict) | ALL CHECKS PASSED | `docs/infrastructure/phase0-audit.md` |
+| Spec coverage (spec §9.1) | Complete | `docs/infrastructure/phase0-audit.md` §1 |
+| Acceptance audit | PASS (20 ADRs conform, 4 JSON Schemas valid, 10 infra docs have required sections, backlog has 20 items) | `docs/infrastructure/phase0-audit.md` §3 |
+| Edge-case hunt | PASS (documented in §4) | `docs/infrastructure/phase0-audit.md` |
+| Blind hunt | PASS (independent reviewer with fresh context; findings and fixes recorded) | `docs/infrastructure/phase0-audit.md` §5 |
+| Security review | PASS (trust boundaries, secret stores, non-root containers, SHA-pinned actions, signed artifacts with provenance) | `docs/infrastructure/phase0-audit.md` §6 |
+
+## UAT Decision (post-phase session)
+
+- **Status**: not applicable (Phase 0 is documentation-only; no user-facing behavior)
+- **User decision**: phase-audit accepted on evidence
+- **Rationale**: validator PASS + 4 review gates PASS per `docs/infrastructure/phase0-audit.md`. The phase-audit PR is the post-phase exit artifact.
+
+## PR Status
+
+- **PR #1** (spec + plan): https://github.com/magalz/CandelaMoon/pull/1 — branch `docs/roadmap-design`
+- **PR #2** (Phase 0 audit): https://github.com/magalz/CandelaMoon/pull/2 — branch `docs/phase0-delivery-system-design` — **MERGED** (per session-handout dated 2026-08-06)

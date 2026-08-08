@@ -38,3 +38,5 @@ Treating the graph index as the source of truth lets it contradict shipped code,
 ### GitHub Primary Only
 
 Ignoring Memtrace as an authority makes it optional, and the derived evidence trail that supports deletions and impact claims degrades. Rejected.
+
+**Framework reference**: This ADR is operationalized in .maestro-space/maestro-docs/maestro-orchestrator-guide.md §7 (Session Boundary Hard Rule) and .maestro-space/maestro-docs/maestro-workflow.md §5 (Multi-Tasking Prohibition). The GitHub/Memtrace split is enforced by .maestro-space/maestro-templates/agent-output.schema.json (frontmatter memtrace_indexed_sha must equal head_sha). For the full stack, see .maestro-space/maestro-plans/master-roadmap.md.

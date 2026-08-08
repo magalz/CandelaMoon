@@ -132,3 +132,8 @@ No exploitable security findings. The security design documents cover all major 
 | Known debt | 7 items, all documented with resolution phase |
 
 **Sign-off:** Phase 0 exit gate met. Phase 1 (Delivery Foundation) may begin.
+---
+
+## Post-Restructure Reference (2026-08-07)
+
+After the .maestro-space/ restructure, the Phase 0 session handout moved to .maestro-space/maestro-works/phase-0-delivery-system/post-phase-0/session-handout.md. The Phase 0 backlog (retrofitted) is at .maestro-space/maestro-plans/phase-0-delivery-system-backlog.md. The master roadmap is at .maestro-space/maestro-plans/master-roadmap.md. See .maestro-space/index.md for the framework entry point.

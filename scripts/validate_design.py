@@ -97,6 +97,13 @@ INFRA_REQUIRED_SECTIONS = {
         "# Phase 1 Implementation Backlog",
         "## Work Items",
     ],
+    # The implementation-backlog.md moved to .maestro-space/maestro-plans/phase-1-delivery-system-backlog.md
+    # in the 2026-08-07 restructure. The validator checks the new filename + path. The
+    # section headings are unchanged.
+    "phase-1-delivery-system-backlog.md": [
+        "# Phase 1 Implementation Backlog",
+        "## Work Items",
+    ],
 }
 
 try:
@@ -293,7 +300,29 @@ def check_adr_template(report: Report, root: Path) -> None:
 
 def check_infra_docs(report: Report, root: Path) -> None:
     for name in INFRA_REQUIRED_SECTIONS:
-        path = root / "docs" / "infrastructure" / name
+        # The Phase 1 implementation backlog moved to .maestro-space/maestro-plans/
+        # in the 2026-08-07 restructure (file renamed to phase-1-delivery-system-backlog.md).
+        # The validator checks the new location; if not found, it falls back to the old
+        # location with a deprecation note.
+        if name == "implementation-backlog.md":
+            new_path = root / ".maestro-space" / "maestro-plans" / "phase-1-delivery-system-backlog.md"
+            old_path = root / "docs" / "infrastructure" / name
+            if new_path.is_file():
+                path = new_path
+            elif old_path.is_file():
+                path = old_path
+            else:
+                report.add(
+                    f"infra: {name}",
+                    False,
+                    f"missing file at both new ({new_path}) and old ({old_path}) locations",
+                )
+                continue
+        elif name == "phase-1-delivery-system-backlog.md":
+            # New maestro location for the Phase 1 implementation backlog.
+            path = root / ".maestro-space" / "maestro-plans" / name
+        else:
+            path = root / "docs" / "infrastructure" / name
         if not path.is_file():
             report.add(f"infra: {name}", False, f"missing file: {path}")
             continue
@@ -316,7 +345,25 @@ def check_infra_docs(report: Report, root: Path) -> None:
 
 def check_infra_sections(report: Report, root: Path) -> None:
     for name, required in INFRA_REQUIRED_SECTIONS.items():
-        path = root / "docs" / "infrastructure" / name
+        # Same new-location fallback for the implementation-backlog.
+        if name == "implementation-backlog.md":
+            new_path = root / ".maestro-space" / "maestro-plans" / "phase-1-delivery-system-backlog.md"
+            old_path = root / "docs" / "infrastructure" / name
+            if new_path.is_file():
+                path = new_path
+            elif old_path.is_file():
+                path = old_path
+            else:
+                report.add(
+                    f"sections: {name}",
+                    False,
+                    f"missing file at both new ({new_path}) and old ({old_path}) locations",
+                )
+                continue
+        elif name == "phase-1-delivery-system-backlog.md":
+            path = root / ".maestro-space" / "maestro-plans" / name
+        else:
+            path = root / "docs" / "infrastructure" / name
         if not path.is_file():
             report.add(f"sections: {name}", False, f"missing file: {path}")
             continue

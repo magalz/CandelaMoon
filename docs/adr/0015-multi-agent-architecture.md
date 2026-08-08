@@ -38,3 +38,5 @@ One agent writing and reviewing its own work lacks independence, accumulates con
 ### Human Does All Review
 
 A solo human reviewing every change at scale is not sustainable and would bottleneck development. Rejected.
+
+**Framework reference**: This ADR is operationalized in .maestro-space/maestro-docs/maestro-orchestrator-guide.md §1 (Agent Dispatch Matrix) and .maestro-space/maestro-agents/agent-manifest.json (the agent registry mapping logical names to subagent_type). The full production+review agent roster is defined there. Conventions: .maestro-space/maestro-docs/maestro-conventions.md.

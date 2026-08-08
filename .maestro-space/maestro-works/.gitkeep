@@ -1,0 +1,4 @@
+# Marker — maestro-works is per-task session artifacts. Per-task folders are created
+# at session start and live for the duration of the task. They are TRACKED (the
+# whole .maestro-space/ is tracked), so the work is reviewable in the PR.
+# See .maestro-space/maestro-docs/maestro-conventions.md §1-§2.
