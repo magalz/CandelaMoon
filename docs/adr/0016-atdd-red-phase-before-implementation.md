@@ -38,3 +38,5 @@ Tests written after the fact encode what the implementation does, including its 
 ### No TDD
 
 Without a red phase, there is no behavioral safety net for the refactors and deletions CandelaMoon's disposition process requires. Rejected.
+
+**Framework reference**: This ADR is operationalized in .maestro-space/maestro-docs/maestro-orchestrator-guide.md §2.2 (Handoff File Structure) and .maestro-space/maestro-templates/atdd-checklist.md (the ATDD checklist template). The red-phase requirement is encoded in the handoff frontmatter 	dd_artifacts.red_phase_verified: true.

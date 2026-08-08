@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "atdd-checklist",
+  "agent": {
+    "name": "QA Architect",
+    "role": "ATDD red-phase scaffold creation (ADR 0016)",
+    "subagent_type": "qa-architect",
+    "task_id": "P1-021"
+  },
+  "task": {
+    "change_id": "P1-021",
+    "phase": "Phase 1",
+    "phase_short": "phase-1-delivery-system",
+    "branch": "phase1/p1-021-baseline-test-fixes",
+    "base_sha": "53659407e185a4629bf9654a14f0f39b2c5c38c0"
+  },
+  "data": {
+    "scaffolds": [
+      {
+        "id": 1,
+        "test": "LayoutInflationTest.allLayoutsInflateSuccessfully",
+        "file": "app/src/test/java/com/limelight/LayoutInflationTest.java",
+        "lines": "25-39",
+        "ac": 1,
+        "root_cause": "activity_app_view.xml uses ExtendedFloatingActionButton which requires a Theme.MaterialComponents descendant; test inflates under Theme_AppCompat -> InflateException"
+      },
+      {
+        "id": 2,
+        "test": "SimpleStartupTest.testApplicationOnCreate",
+        "file": "app/src/test/java/com/limelight/SimpleStartupTest.java",
+        "lines": "55-71",
+        "ac": 2,
+        "root_cause": "ArtemisApplication.onCreate() calls ProfilesManager.load(this) which reaches Context.getFilesDir(); Robolectric never calls attachBaseContext for directly constructed Application -> mBase is null -> NPE"
+      },
+      {
+        "id": 3,
+        "test": "StartupCrashTest.testUiHelperCrash",
+        "file": "app/src/test/java/com/limelight/StartupCrashTest.java",
+        "lines": "93-103",
+        "ac": 3,
+        "root_cause": "PcView creation / UiHelper.setLocale() touches Context services before base is attached under Robolectric; the path is shared with Task B and is fixed by the same production change"
+      }
+    ],
+    "implementation_tasks": [
+      { "id": "A", "scaffold": 1, "ac": [1, 5], "verify": "./gradlew :app:testNonRoot_gameDebugUnitTest --tests com.limelight.LayoutInflationTest is green" },
+      { "id": "B", "scaffold": 2, "ac": [2, 5], "verify": "./gradlew :app:testNonRoot_gameDebugUnitTest --tests com.limelight.SimpleStartupTest is green; ProfilesManager.getInstance() and getProfiles() non-null" },
+      { "id": "C", "scaffold": 3, "ac": [3, 5], "verify": "./gradlew :app:testNonRoot_gameDebugUnitTest --tests com.limelight.StartupCrashTest is green" },
+      { "id": "D", "scaffold": null, "ac": [4], "verify": "./gradlew testNonRoot_gameDebugUnitTest is green for the whole nonRoot_gameDebug variant" }
+    ],
+    "forbidden_changes": [
+      "Add @Ignore to any scaffold",
+      "Replace Theme_AppCompat with a Material theme in the test",
+      "Wrap body in try/catch that swallows the NPE",
+      "Stub UiHelper.setLocale to a no-op in production",
+      "Broaden testOptions to skip flaky tests"
+    ],
+    "red_phase_verified": true,
+    "red_phase_method": "confirm-existing",
+    "red_phase_notes": "Scaffolds already exist in the repository; not @Ignore'd, do not use Assume, do not weaken assertions. The QA Architect confirms them as the red-phase scaffolds rather than duplicating them; duplicate scaffolds would risk drift and weaken the red signal."
+  },
+  "emitted_at": "2026-08-07T15:15:21Z",
+  "narrative_path": ".maestro-space/maestro-works/phase-1-delivery-system/p1-021-baseline-test-fixes/atdd-checklist.md"
+}

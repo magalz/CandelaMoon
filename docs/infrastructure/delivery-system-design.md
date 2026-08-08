@@ -79,7 +79,7 @@ This document is the master integration reference for the CandelaMoon delivery s
 
 ## Agent Architecture
 
-- Reference: spec section 15, `orchestrator-guide.md`
+- Reference: spec section 15, `.maestro-space/maestro-docs/maestro-orchestrator-guide.md` (the framework operationalizes the agent architecture; this file is the product-side summary)
 - Summary: 7 production agents (Senior Developer, QA Architect, DevOps Architect, Security Analyst, GRC Architect, Tech Writer, UX/UI Designer) and 5 review agents (Blind Hunter, Edge Case Hunter, Acceptance Analyst, Red Team, Blue Team). Handoff protocol connects agents. Session handouts prevent context rot.
-- Orchestrator guide: `orchestrator-guide.md` defines the dispatch matrix, handoff file protocol, context scoping, review pipeline, and task execution flow.
-- ADRs: 0015 (multi-agent architecture), 0016 (ATDD red-phase), 0017 (two-phase review), 0018 (red/blue team), 0019 (coverage audit with Memtrace), 0020 (session handout).
+- Orchestrator guide: `.maestro-space/maestro-docs/maestro-orchestrator-guide.md` defines the dispatch matrix, handoff file protocol, context scoping, review pipeline, and task execution flow. (The legacy `docs/infrastructure/orchestrator-guide.md` was removed in the 2026-08-07 restructure; the maestro version is authoritative.)
+- ADRs: 0015 (multi-agent architecture), 0016 (ATDD red-phase), 0017 (two-phase review), 0018 (red/blue team), 0019 (coverage audit with Memtrace), 0020 (session handout). Each ADR's `## Framework reference` section points to the corresponding `.maestro-space/` doc.

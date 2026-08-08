@@ -38,3 +38,5 @@ Conversation history is not preserved across sessions and degrades within long o
 ### No Handout
 
 Without a handout, every session starts blind, re-exploring the codebase and re-deriving decisions that were already made. Rejected.
+
+**Framework reference**: This ADR is operationalized in .maestro-space/maestro-docs/maestro-workflow.md §6 (Session Handout) and .maestro-space/maestro-templates/session-handout.md (the handout template). Every task's handout is recorded at .maestro-space/maestro-works/<phase>/<task>/session-handout.{md,json}. See also .maestro-space/maestro-conventions.md §7 (Session Handout Conventions).

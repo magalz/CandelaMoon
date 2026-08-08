@@ -1,0 +1,3 @@
+# Marker — maestro-secrets holds workflow secrets (API keys, tokens, .env files, etc.).
+# This directory is NEVER tracked. Access is restricted to the orchestrator at runtime.
+# See .maestro-space/.gitignore for the rule and .maestro-space/maestro-docs/maestro-conventions.md §8.

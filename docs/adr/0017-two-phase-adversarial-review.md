@@ -38,3 +38,5 @@ One review pass covering all roles causes reviewer fatigue and destroys independ
 ### All Reviewers in Parallel Including Security
 
 Running security in parallel with everything else breaks the red-team-to-blue-team ordering; blue team cannot design mitigations before red team's attack scenarios exist. Rejected.
+
+**Framework reference**: This ADR is operationalized in .maestro-space/maestro-docs/maestro-orchestrator-guide.md §4 (Review Pipeline Orchestration) and the review-templates in .maestro-space/maestro-templates/ (gent-findings-report.md, gent-activity-report.md). The two-phase structure (Phase 1 parallel + Phase 2 sequential) is defined there.

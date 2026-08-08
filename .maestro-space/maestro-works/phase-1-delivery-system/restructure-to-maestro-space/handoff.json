@@ -1,0 +1,80 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "handoff",
+  "agent": {
+    "name": "Orchestrator (Product Owner)",
+    "role": "Documentation-only restructure (full reconciliation to tracked .maestro-space/ framework)",
+    "subagent_type": "product-owner",
+    "dispatched_by": "candelamoon-orchestrator",
+    "task_id": "RESTRUCTURE-2026-08-08"
+  },
+  "task": {
+    "change_id": "RESTRUCTURE-2026-08-08",
+    "phase": "Phase 1",
+    "phase_short": "phase-1-delivery-system",
+    "branch": "docs/restructure-to-maestro-space",
+    "base_sha": "53659407e185a4629bf9654a14f0f39b2c5c38c0",
+    "head_sha": "855591f8",
+    "pr_url": "https://github.com/magalz/CandelaMoon/pull/8"
+  },
+  "data": {
+    "title": "Restructure documentation to tracked .maestro-space/ framework (full reconciliation)",
+    "task_statement": "Bring the .maestro-space/ orchestration framework into the tracked tree and align all documentation to the new locations. Per the user's directive: 'we will remove .maestro-space from the gitignore ... and have all in the remote'. Also create the master plan (master-roadmap.md) from spec §11 in the phase/task structure.",
+    "bootstrap_exception": "Documentation-only task. Per maestro-workflow.md §2, the TDD red phase (step 2) and coverage audit (step 10) are skipped. The validator script (python scripts/validate_design.py --strict) is the documentation test.",
+    "acceptance_criteria": [
+      "All framework files moved from docs/{handoffs,audits,infrastructure} to .maestro-space/maestro-{works,plans,docs}/",
+      ".maestro-space/ tree created with index.md, .gitignore, maestro-docs (3 files), maestro-plans (5 files including master-roadmap), maestro-templates (17 files), maestro-agents (1 file), maestro-secrets marker, maestro-works starter",
+      "Master roadmap created at .maestro-space/maestro-plans/master-roadmap.md (distilled from spec §11)",
+      "Phase 0 backlog retrofitted at .maestro-space/maestro-plans/phase-0-delivery-system-backlog.md",
+      "Phase 2 stub created at .maestro-space/maestro-plans/phase-2-repositories-and-baselines-backlog.md",
+      "P1-021 handoff/atdd-checklist/session-handout/coverage-audit + JSON companions moved to .maestro-space/maestro-works/phase-1-delivery-system/p1-021-baseline-test-fixes/",
+      "Phase 0 session-handout moved to .maestro-space/maestro-works/phase-0-delivery-system/post-phase-0/session-handout.md",
+      "All references in spec, plan, ADRs 0013/0015-0020, README, CONTRIBUTING, PR template, delivery-system-design, phase0-audit reconciled to new locations",
+      ".gitignore updated: .maestro-space/ exclusion removed (framework is now tracked); .maestro-space/maestro-secrets/ is the only ignored part (handled by .maestro-space/.gitignore)",
+      "scripts/validate_design.py updated to look at the new maestro location for the implementation backlog",
+      "python scripts/validate_design.py --strict passes 48/48",
+      "PR opened as bot via open-pr-bot.yml; awaiting @magalz review and merge"
+    ],
+    "implementation_artifacts": {
+      "files_created_count": 41,
+      "files_modified_count": 14,
+      "files_deleted_count": 2,
+      "files_renamed_count": 3,
+      "total_files_changed": 58,
+      "insertions": 7153,
+      "deletions": 2752,
+      "green_phase_verified": true,
+      "green_phase_evidence": "python scripts/validate_design.py --strict: 48 passed, 0 failed (no testable behavior; validator is the documentation test)"
+    },
+    "coverage_audit": {
+      "rating": "pass",
+      "risk_weighted_score": 0,
+      "notes": "Bootstrap exception: no testable behavior, no AC scoring. The validator (48/48) is the documentation test for this task."
+    },
+    "uat": {
+      "status": "pending",
+      "user_decision": "Not applicable (docs-only); user decision is the PR review/approval."
+    },
+    "adrs": ["0013", "0015", "0016", "0017", "0018", "0019", "0020"],
+    "verification": {
+      "tests_pass": true,
+      "memtrace_review": false,
+      "acceptance_audit": true,
+      "edge_case_hunt": false,
+      "blind_hunt": false,
+      "security_review": false,
+      "policy_check": true,
+      "notes": "tests_pass = validator PASS; memtrace_review/edge_case_hunt/blind_hunt/security_review are pending PR review by @magalz; acceptance_audit and policy_check are passed. Final transition to status: done is gated on PR merge."
+    },
+    "known_debt_summary": [
+      "RESTR-001: PR body has minor PowerShell escape character artifacts (cosmetic).",
+      "RESTR-002: P1-021 agent reports and findings-*.{json,md} not included (not findable in prior session artifacts).",
+      "RESTR-003: Memtrace index is on pre-restructure HEAD; reconcile after PR merge.",
+      "RESTR-004: P1-021 branch has uncommitted .gitignore modification; redundant after this restructure merges.",
+      "RESTR-005: .github/workflows/create-pr.yml untracked on main worktree (out of scope).",
+      "RESTR-006: .opencode/, opencode.json, .worktrees/ untracked on main worktree (out of scope)."
+    ]
+  },
+  "emitted_at": "2026-08-08T02:28:21Z",
+  "narrative_path": ".maestro-space/maestro-works/phase-1-delivery-system/restructure-to-maestro-space/handoff.md"
+}

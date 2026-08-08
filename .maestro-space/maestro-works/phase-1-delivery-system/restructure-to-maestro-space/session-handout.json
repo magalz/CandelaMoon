@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "session-handout",
+  "agent": {
+    "name": "Tech Writer (with Orchestrator input)",
+    "role": "Session handout for context continuity (ADR 0020)",
+    "subagent_type": "tech-writer",
+    "task_id": "RESTRUCTURE-2026-08-08"
+  },
+  "task": {
+    "change_id": "RESTRUCTURE-2026-08-08",
+    "phase": "Phase 1",
+    "phase_short": "phase-1-delivery-system",
+    "branch": "docs/restructure-to-maestro-space",
+    "base_sha": "53659407e185a4629bf9654a14f0f39b2c5c38c0",
+    "head_sha": "855591f8",
+    "pr_url": "https://github.com/magalz/CandelaMoon/pull/8"
+  },
+  "data": {
+    "title": "Restructure to tracked .maestro-space/ framework",
+    "date": "2026-08-08",
+    "current_state": {
+      "branch": "docs/restructure-to-maestro-space",
+      "head_sha": "855591f8",
+      "base_sha": "53659407e185a4629bf9654a14f0f39b2c5c38c0",
+      "pr_url": "https://github.com/magalz/CandelaMoon/pull/8",
+      "pr_state": "DRAFT",
+      "pr_author": "candelamoon-bot",
+      "pr_title": "docs(maestro-space): restructure to tracked .maestro-space/ framework (full reconciliation)",
+      "handoff_status": "in-progress",
+      "uat_status": "pending (not applicable; docs-only)"
+    },
+    "completed_evidence": [
+      { "gate": "Phase A (framework creation)", "result": ".maestro-space/ tree created", "evidence": "commit 855591f8" },
+      { "gate": "Phase B (docs/ reorganization)", "result": "orchestrator-guide deleted; implementation-backlog, session-handout-phase0, p1-021 handoffs/audit moved", "evidence": "git renames" },
+      { "gate": "Phase C (master roadmap + phase 2+ plans)", "result": "master-roadmap.md, phase-0-delivery-system-backlog.md, phase-2-repositories-and-baselines-backlog.md created", "evidence": "commit 855591f8" },
+      { "gate": "Phase D (template adaptation)", "result": "p1-021 handoff/atdd-checklist/session-handout/coverage-audit + JSON companions created; phase-0 session-handout adapted", "evidence": "commit 855591f8" },
+      { "gate": "Phase E (reference reconciliation)", "result": "spec, plan, ADRs, README, CONTRIBUTING, PR template, delivery-system-design, phase0-audit, .gitignore all updated", "evidence": "commit 855591f8" },
+      { "gate": "Phase F (validation)", "result": "validator 48/48 PASS", "evidence": "python scripts/validate_design.py --strict" },
+      { "gate": "Phase G (PR opened)", "result": "PR #8 created DRAFT by candelamoon-bot", "evidence": "GitHub Actions run 31235029292" },
+      { "gate": "Phase H (handout)", "result": "session-handout.md + handoff.md created at the new task folder", "evidence": "this file" }
+    ],
+    "pending_work": [
+      "@magalz review/approval of PR #8 — the restructure is in DRAFT state; validator passes (48/48)",
+      "After merge — reconcile the Memtrace graph against the new head (RESTR-003)",
+      "After merge — begin P1-001 (candelamoon-android Containerfile) at .maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android/"
+    ],
+    "known_debt": [
+      { "id": "RESTR-001", "severity": "low", "item": "PR #8 body has minor PowerShell escape character artifacts (cosmetic)", "resolution": "Re-author via gh pr edit if needed" },
+      { "id": "RESTR-002", "severity": "low", "item": "P1-021 agent reports and findings-*.{json,md} not included", "resolution": "Future tasks emit the full JSON+MD hybrid per maestro-conventions §1" },
+      { "id": "RESTR-003", "severity": "medium", "item": "Memtrace index is on pre-restructure HEAD", "resolution": "Reindex after PR merge" },
+      { "id": "RESTR-004", "severity": "low", "item": "P1-021 branch has uncommitted .gitignore modification; redundant after this restructure merges", "resolution": "git checkout .gitignore on P1-021 branch" },
+      { "id": "RESTR-005", "severity": "low", "item": ".github/workflows/create-pr.yml untracked on main worktree", "resolution": "Out of scope; commit in follow-up if needed" },
+      { "id": "RESTR-006", "severity": "low", "item": ".opencode/, opencode.json, .worktrees/ untracked on main worktree", "resolution": "Out of scope; commit or discard in follow-up" }
+    ]
+  },
+  "emitted_at": "2026-08-08T02:30:00Z",
+  "narrative_path": ".maestro-space/maestro-works/phase-1-delivery-system/restructure-to-maestro-space/session-handout.md"
+}

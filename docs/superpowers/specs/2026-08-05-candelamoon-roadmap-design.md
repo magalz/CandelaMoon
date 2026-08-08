@@ -770,3 +770,12 @@ At the end of every task or phase, the Tech Writer creates a session handout doc
 - Keys for next session: handoff file path, spec path, ADR register path, evidence manifest path, test artifact paths
 - Known debt: deferred or incomplete items
 - Rollback strategy: how to undo this work if needed
+
+---
+
+> **Post-restructure note (2026-08-07)**: Section 15.1's agent roster and the per-task 14-step cycle are operationalized in the tracked .maestro-space/ framework. See:
+> - .maestro-space/index.md (framework entry point)
+> - .maestro-space/maestro-docs/maestro-orchestrator-guide.md (dispatch matrix, handoff protocol, review pipeline)
+> - .maestro-space/maestro-docs/maestro-workflow.md (14-step cycle + post-phase + maintenance)
+> - .maestro-space/maestro-docs/maestro-conventions.md (JSON+MD output, naming, agent contracts)
+> - .maestro-space/maestro-agents/agent-manifest.json (the agent registry)

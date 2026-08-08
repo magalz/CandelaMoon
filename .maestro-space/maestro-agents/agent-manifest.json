@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "1.0.0",
+  "manifest_purpose": "Registry of agents the orchestrator can dispatch. Maps the logical agent name to the subagent_type and the dispatch matrix entry. Keep this in sync with maestro-docs/maestro-orchestrator-guide.md §1.",
+  "convention": "The agent's logical name (the human-facing role) and its subagent_type (the string passed to the task tool) are recorded separately because the opencode runtime requires the kebab-case form while the orchestrator's plans and handoffs use the human-readable form.",
+  "agents": {
+    "production": [
+      {
+        "name": "Senior Developer",
+        "role": "Implements code per task spec and TDD suite. Java/Android, Kotlin/Compose for TV, NDK/JNI, streaming protocol. Activates tests one at a time (red to green), refactors while green, updates handoff with implementation evidence.",
+        "subagent_type": "senior-developer",
+        "receives": ["handoff", "tdd-suite", "activity-report-template"],
+        "updates": ["handoff frontmatter (implementation_artifacts, green_phase_verified, head_sha)", "agent-activity-report.{json,md}"]
+      },
+      {
+        "name": "QA Architect",
+        "role": "Creates TDD red-phase test scaffolds before implementation. Runs coverage audits with Memtrace reconciliation after implementation. Gates tasks between development and UAT.",
+        "subagent_type": "qa-architect",
+        "receives": ["handoff", "task-spec", "acceptance-criteria"],
+        "updates": ["atdd-checklist.{json,md}", "coverage-audit.{json,md}", "agent-activity-report.{json,md}"]
+      },
+      {
+        "name": "DevOps Architect",
+        "role": "Podman-first container design, GitHub Actions CI, self-hosted runners, device lab, signing, release engineering.",
+        "subagent_type": "devops-architect",
+        "receives": ["handoff", "toolchain-pins", "ci-architecture"],
+        "updates": ["handoff frontmatter", "agent-activity-report.{json,md}"]
+      },
+      {
+        "name": "Security Analyst",
+        "role": "Threat modeling, supply chain policy, secrets management, signing policy, incident response, DevSecOps design.",
+        "subagent_type": "security-analyst",
+        "receives": ["handoff", "spec-sections"],
+        "updates": ["handoff frontmatter", "agent-activity-report.{json,md}"]
+      },
+      {
+        "name": "GRC Architect",
+        "role": "ADR governance, compliance checks, waiver management, policy enforcement, audit trails. Ensures no undocumented decision affects the product boundary.",
+        "subagent_type": "grc-architect",
+        "receives": ["handoff", "adr-register", "evidence-manifests"],
+        "updates": ["handoff frontmatter", "agent-activity-report.{json,md}"]
+      },
+      {
+        "name": "Tech Writer",
+        "role": "Documents every artifact, creates session handouts to prevent context rot, maintains handoff file with finalized information. In the post-phase session, also consolidates all per-task artifacts and produces the session handout.",
+        "subagent_type": "tech-writer",
+        "receives": ["handoff", "all-task-artifacts"],
+        "updates": ["session-handout.{json,md}", "agent-activity-report.{json,md}"]
+      },
+      {
+        "name": "UX/UI Designer",
+        "role": "Visual design system, TV UX patterns, accessibility, D-pad flows, Compose for TV evaluation.",
+        "subagent_type": "ux-ui-designer",
+        "receives": ["handoff", "design-reference", "spec"],
+        "updates": ["handoff frontmatter", "agent-activity-report.{json,md}"]
+      }
+    ],
+    "review": [
+      {
+        "name": "Blind Hunter",
+        "role": "Cynical adversarial reviewer with zero context. Finds what is missing, not just what is wrong. Returns at least 10 issues per review.",
+        "subagent_type": "blind-hunter",
+        "receives": ["spec", "diff", "tests"],
+        "does_not_receive": ["handoff", "plan", "adrs", "author-rationale", "conversation-history"],
+        "updates": ["findings-phase-1.{json,md}"]
+      },
+      {
+        "name": "Edge Case Hunter",
+        "role": "Exhaustive path enumeration, boundary conditions, deletion check. Method-driven, not attitude-driven.",
+        "subagent_type": "edge-case-hunter",
+        "receives": ["diff"],
+        "does_not_receive": ["handoff", "plan", "adrs", "author-rationale", "conversation-history"],
+        "updates": ["findings-phase-1.{json,md}"]
+      },
+      {
+        "name": "Acceptance Analyst",
+        "role": "Reviews diff against spec and acceptance criteria. Finds deviations from spec intent.",
+        "subagent_type": "acceptance-analyst",
+        "receives": ["spec", "diff", "acceptance-criteria"],
+        "does_not_receive": ["handoff", "plan", "adrs", "author-rationale", "conversation-history"],
+        "updates": ["findings-phase-1.{json,md}"]
+      },
+      {
+        "name": "Red Team Analyst",
+        "role": "Offensive security reviewer. Finds exploitable weaknesses with concrete attack scenarios using STRIDE and OWASP.",
+        "subagent_type": "red-team-analyst",
+        "receives": ["diff", "spec-context"],
+        "does_not_receive": ["handoff", "plan", "adrs", "author-rationale", "conversation-history"],
+        "updates": ["findings-phase-2.{json,md}"]
+      },
+      {
+        "name": "Blue Team Analyst",
+        "role": "Defensive security reviewer. Receives red team findings and designs concrete, implementable mitigations. Assesses exploitability, confirms or rejects findings, checks for new risks introduced by mitigations.",
+        "subagent_type": "blue-team-analyst",
+        "receives": ["red-team-findings", "diff"],
+        "does_not_receive": ["handoff", "plan", "adrs", "author-rationale", "conversation-history"],
+        "updates": ["findings-phase-2.{json,md}"]
+      }
+    ]
+  },
+  "post_phase_session_dispatch_order": {
+    "description": "Order in which the 4 architects are dispatched in the post-phase session. Two parallel pairs (grc+security in parallel, qa+devops in parallel) is the recommended default; sequential dispatch is the fallback if the runtime does not support parallel dispatch.",
+    "recommended": [
+      { "phase": 1, "agents": ["grc-architect", "security-analyst"], "parallel": true },
+      { "phase": 2, "agents": ["qa-architect", "devops-architect"], "parallel": true }
+    ],
+    "fallback_sequential": [
+      "grc-architect",
+      "qa-architect",
+      "security-analyst",
+      "devops-architect"
+    ]
+  },
+  "review_pipeline_dispatch_order": {
+    "phase_1": {
+      "parallel": true,
+      "agents": ["blind-hunter", "edge-case-hunter", "acceptance-analyst"]
+    },
+    "phase_2": {
+      "sequential": true,
+      "first": "red-team-analyst",
+      "second": "blue-team-analyst",
+      "note": "Blue team receives red team findings as input. Sequential by design."
+    }
+  }
+}
