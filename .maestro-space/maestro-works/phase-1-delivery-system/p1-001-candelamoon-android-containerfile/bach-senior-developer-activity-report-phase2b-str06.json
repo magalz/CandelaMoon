@@ -1,0 +1,96 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "activity-report",
+  "agent": {
+    "name": "Bach (Senior Developer)",
+    "role": "Senior Developer — implements handoff tasks with TDD discipline, applies review patches, verifies with build + runtime evidence",
+    "subagent_type": "bach-senior-developer",
+    "dispatched_by": "Bernstein (orchestrator)",
+    "task_id": "P1-001"
+  },
+  "task": {
+    "change_id": "P1-001",
+    "phase": "Phase 1",
+    "phase_short": "phase-1-delivery-system",
+    "branch": "moonlight-noir",
+    "base_sha": "0262b0a8",
+    "head_sha": "7731c4e7640ca6e09af80de8d62b661cd5f2510b",
+    "pr_url": ""
+  },
+  "data": {
+    "actions": [
+      "Read handoff, the STR-06 entry in review_phase_2.triaged_findings (Brahms' highest-practical-priority apply-now finding), and the current Containerfile to locate the chown RUN.",
+      "Red-phase evidence against the pre-change image (candelamoon-android:phase2, id f039d5aeb08b...): /opt/android-sdk and /opt/gradle are builder:builder and builder can touch files under /opt/android-sdk — the poisonable state STR-06 targets.",
+      "Pre-change tree audit for the patch's find -exec chmod go-w passes: 35 symlinks under /opt/android-sdk /opt/gradle, all resolving in-tree, zero dangling (no chmod error can fail the && chain); -type f/-type d do not match symlinks; chmod go-w preserves execute/traversal bits.",
+      "PATCH (STR-06): replaced 'RUN chown -R builder:builder /opt/android-sdk /opt/gradle /home/builder' with the dispatched block — chown -R root:root /opt/android-sdk /opt/gradle, find -type d -exec chmod go-w {} +, find -type f -exec chmod go-w {} +, chown -R builder:builder /home/builder — and updated the section header comment (root-owned tool trees, builder-owned runtime caches; ci-architecture.md + STR-06 citations).",
+      "Green phase: podman build --pull=never -t candelamoon-android:str06 -f infra/containers/candelamoon-android/Containerfile . -> 18/18 steps (steps 1-11 layer-cached; step 12 STR-06 RUN and steps 13-18 rebuilt), Successfully tagged localhost/candelamoon-android:str06 (id 6e1fa84379f2b9fed351a552505f40afaa5fa4ce9dd07b0a4a3501ad6a41dccf).",
+      "Dispatch verification under --network=none: ls -la /opt/android-sdk/platform-tools/adb -> -rwxr-xr-x root root 10642368; adb version -> 37.0.1-15733141; touch /opt/android-sdk/test_write -> Permission denied + 'EXPECTED: cannot write'; touch /home/builder/test_write -> 'OK: home writable'.",
+      "Permission-state regression: stat /opt/android-sdk /opt/gradle /home/builder -> root:root 755 / root:root 755 / builder:builder 750; find -type d -perm /022 and -type f -perm /022 under tool trees -> 0 each; find -not -user root -> 0 non-root entries.",
+      "Toolchain regression under --network=none: id -> uid=1000(builder) gid=1000(builder) groups=1000(builder); java -version -> openjdk 17.0.19; sdkmanager --list -> all five pinned packages; gradle --version (CLI from read-only /opt/gradle) -> Gradle 8.13; offline ./gradlew --version in a throwaway project (repo wrapper layout preserved, CR stripped) -> Gradle 8.13, Kotlin 2.0.21, Launcher JVM 17.0.19, dist resolved from builder-owned /home/builder/.gradle/wrapper/dists.",
+      "mtime normalization regression: stat -c %y on adb, gradle, wrapper zip -> all 2025-01-01 00:00:00 UTC.",
+      "Committed code change (7731c4e7, only the Containerfile; unrelated working-tree files left untouched), updated handoff (head_sha -> 7731c4e7, review_phase_2.triaged_findings STR-06 disposition -> applied with in-image evidence, Agent Output section), wrote this report."
+    ],
+    "files": {
+      "created": [
+        ".maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/bach-senior-developer-activity-report-phase2b-str06.md",
+        ".maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/bach-senior-developer-activity-report-phase2b-str06.json"
+      ],
+      "modified": [
+        "infra/containers/candelamoon-android/Containerfile",
+        ".maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/handoff.md"
+      ]
+    },
+    "verification": {
+      "commit": {
+        "sha": "7731c4e7640ca6e09af80de8d62b661cd5f2510b",
+        "message": "fix(infra): apply STR-06 root-owned read-only tool trees (P1-001)"
+      },
+      "red_phase": {
+        "image": "candelamoon-android:phase2 (f039d5aeb08b...)",
+        "ownership_observed": "/opt/android-sdk and /opt/gradle: builder:builder (poisonable)",
+        "write_probe": "touch /opt/android-sdk/red-phase-probe as builder succeeds"
+      },
+      "build": {
+        "command": "podman build --pull=never -t candelamoon-android:str06 -f infra/containers/candelamoon-android/Containerfile .",
+        "result": "success (18/18 steps)",
+        "image_id": "6e1fa84379f2b9fed351a552505f40afaa5fa4ce9dd07b0a4a3501ad6a41dccf"
+      },
+      "dispatch_checks": {
+        "adb_ls": "-rwxr-xr-x 1 root root 10642368 Jan  1  2025 /opt/android-sdk/platform-tools/adb",
+        "adb_version": "Android Debug Bridge version 1.0.41 / Version 37.0.1-15733141",
+        "sdk_write": "touch: cannot touch '/opt/android-sdk/test_write': Permission denied + 'EXPECTED: cannot write'",
+        "home_write": "OK: home writable"
+      },
+      "permission_state": {
+        "ownership": "root:root 755 /opt/android-sdk; root:root 755 /opt/gradle; builder:builder 750 /home/builder",
+        "go_w_dirs": 0,
+        "go_w_files": 0,
+        "non_root_entries": 0
+      },
+      "regression": {
+        "id": "uid=1000(builder) gid=1000(builder) groups=1000(builder)",
+        "java": "openjdk 17.0.19 (2026-04-21) / Temurin-17.0.19+10",
+        "sdkmanager": "build-tools;36.0.0, cmake;3.22.1, ndk;27.0.12077973, platform-tools 37.0.1, platforms;android-36",
+        "gradle_cli": "Gradle 8.13 (read-only /opt/gradle)",
+        "offline_gradlew": "Gradle 8.13, Kotlin 2.0.21, Launcher JVM 17.0.19 (--network=none)",
+        "mtimes": "adb, gradle, wrapper zip all 2025-01-01 00:00:00 UTC"
+      },
+      "diff_scope": "git diff of the commit shows only the STR-06 hunk (9 insertions / 2 deletions); no other files in the commit",
+      "logs": [
+        "%TEMP%/opencode/p1-001-str06/ (wrapper files for the offline gradlew test)"
+      ]
+    },
+    "deviations": [
+      "Section comment updated alongside the RUN — the old 'Permissions: chown everything to builder' header would have misdocumented the new block; the comment now states root-owned tool trees + builder-owned runtime caches, keeping the ci-architecture.md citation and the dispatch's STR-06 rationale verbatim.",
+      "First offline ./gradlew attempt failed on test layout, not the image — the wrapper script resolves $APP_HOME/gradle/wrapper/gradle-wrapper.jar, so flat-copied wrapper files produce 'Could not find or load main class'. Re-ran with the repo layout preserved (gradlew + gradle/wrapper/): passes, same as the prior rounds' method.",
+      "AC5 parenthetical superseded — AC5 as written says all of /opt/android-sdk, /opt/gradle, /home/builder are chown'd to builder; STR-06 intentionally changes the first two. AC text retained as the original acceptance record; the STR-06 triaged entry records the supersession."
+    ],
+    "known_issues": [
+      "STR-10 (archive resource bounds) remains OPEN with Brahms disposition apply-now — the last remaining apply-now finding; suggested as the next patch round.",
+      "STR-01..STR-05 deferred to P1-005 (protected publication gate); STR-09 deferred to P1-010/P1-011 (mount/trust segregation); STR-06 CI-side cache enforcement (read-only/trust-scoped cache volumes) belongs to P1-010/P1-011 per Brahms.",
+      "Phase 1 known debt unchanged: AC8 image DIGEST not bit-reproducible, download SHA-256 TODOs, platform-tools 37.0.1 direct-archive pin, Robolectric 4.16 mapping sensitivity."
+    ]
+  },
+  "emitted_at": "2026-08-09T02:03:04Z",
+  "narrative_path": ".maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/bach-senior-developer-activity-report-phase2b-str06.md"
+}

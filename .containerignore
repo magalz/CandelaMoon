@@ -1,0 +1,149 @@
+# .containerignore for candelamoon-android (and future) image builds
+# ----------------------------------------------------------------------------
+# Patterns excluded from the `podman build` build context to minimize what
+# the build daemon has to copy and to keep image builds hermetic. The
+# Containerfile only uses the context to satisfy the FROM/ADD/COPY
+# references it makes (it makes none in the current revision; the SDK and
+# Gradle distributions are downloaded at build time), so this file mostly
+# exists to (a) make the build faster, and (b) prevent accidental inclusion
+# of host-specific state if a future Containerfile adds a COPY.
+#
+# Per AC9: exclude .git/, .maestro-space/, docs/handoffs/, build outputs,
+# and non-container source artifacts.
+# ----------------------------------------------------------------------------
+
+# --- Version control / metadata ------------------------------------------
+.git/
+.gitattributes
+.gitmodules
+.gitignore
+
+# --- Maestro workspace / framework files ----------------------------------
+# Per AC9: .maestro-space/ excluded from the build context. (It is tracked
+# in git because it carries the project-agnostic Maestro framework, but
+# nothing inside it is needed at container build time.)
+.maestro-space/
+
+# Legacy handoff path (no longer populated, but kept in the ignore list
+# per AC9 and in case old artifacts ever resurface there).
+docs/handoffs/
+
+# --- Build outputs / caches ----------------------------------------------
+# Per AC9: build outputs excluded. These are either already on the
+# developer machine (and irrelevant inside the container) or produced at
+# build/run time and never read back as build context.
+.gradle/
+build/
+app/build/
+**/build/
+**/.cxx/
+out/
+bin/
+gen/
+
+# Android-specific generated and intermediate artifacts
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+output.json
+output-metadata.json
+baselineProfiles/
+app/.externalNativeBuild/
+**/jniLibs/
+
+# --- IDE / editor state ---------------------------------------------------
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+# --- OS / platform junk ---------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Android Studio / local config ----------------------------------------
+# local.properties holds the SDK path on the host; never relevant inside
+# the container (which has its own $ANDROID_HOME).
+local.properties
+key/
+
+# --- Secrets and credentials (must never enter a container image layer) ---
+# BER-015 / B-23: environment files, keystores, certificates, and credential
+# files must never reach the build context or a persisted image layer, even
+# if a future Containerfile revision adds a COPY from the context.
+.env
+.env.*
+*.jks
+*.keystore
+*.p12
+*.pem
+*-key.pem
+*_key.pem
+*.key
+credentials.json
+*.credentials
+secrets/
+**/secrets/
+*.backup
+*.bak
+# Gradle/Maven credential files
+gradle.properties
+**/gradle.properties
+.netrc
+**/.netrc
+.m2/settings.xml
+**/.m2/settings.xml
+.ssh/
+**/.ssh/
+.ssh/id_*
+**/.ssh/id_*
+.aws/
+**/.aws/
+**/credentials
+**/credentials.*
+terraform.tfvars
+terraform.tfvars.json
+**/terraform.tfvars
+**/terraform.tfvars.json
+*.pfx
+**/*.pfx
+
+# --- Memtrace (local index, not needed at container build) ---------------
+.memtrace/
+
+# --- Architecture / design notes (not source for the container) ----------
+new-design/
+new-design/**
+
+# --- Submodules (not used by the Android build; pulled on demand) ---------
+LuaScripts/**
+
+# --- CI workflow files (host-side orchestration, not build inputs) --------
+.github/
+
+# --- Python (not used in this image; relevant only to candelamoon-docs) ---
+**/__pycache__/
+*.pyc
+
+# --- Fastlane / store assets (not needed for unit/lint/native builds) ----
+fastlane/
+store-assets/
+
+# --- Logs / coverage / SBOM scratch ---------------------------------------
+*.log
+*.exec
+*.lst
+*.html
+*.xml.tmp
+
+# --- Backup / swap / editor tempfiles -------------------------------------
+*~
+*.bak
+*.swp
+*.tmp
+*.orig

@@ -8,7 +8,7 @@ workflows, self-hosted runners, and canary PR.
 design validator (P1-017) runs in CI.
 **Related ADRs**: 0013, 0014, 0015, 0019
 **Dependencies on previous phase**: Phase 0 complete.
-**Estimated task count**: 21 tasks (2 completed, 3 in development, 16 pending)
+**Estimated task count**: 21 tasks (3 completed, 3 in development, 15 pending)
 
 ---
 
@@ -18,7 +18,7 @@ design validator (P1-017) runs in CI.
 
 | # | ID | Title | Status | Depends On | Complexity | Evidence |
 |---|---|---|---|---|---|---|
-| 1 | P1-001 | candelamoon-android Containerfile | Pending | — | M | Local dev image in Podman (`localhost/candelamoon-android:dev`); no tracked Containerfile |
+| 1 | P1-001 | candelamoon-android Containerfile | **Completed** | — | M | Containerfile at `infra/containers/candelamoon-android/Containerfile`; green-verified 2026-08-08; review phases 1+2 closed; STR-06 applied. Handoff: `.maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/`. |
 | 2 | P1-002 | candelamoon-docs Containerfile | Pending | — | S | — |
 | 3 | P1-003 | candelamoon-security Containerfile | Pending | — | M | — |
 | 4 | P1-004 | luminal-contract Containerfile | Pending | — | S | — |
@@ -104,7 +104,7 @@ P1-021 already completed (unblocks CI gate)
 
 ## Next Pending Tasks (in priority order)
 
-1. P1-001 → P1-004 (Group A): Containerfiles — no deps, can parallelize
+1. P1-002 → P1-004 (Group A): Remaining Containerfiles (docs, security, luminal-contract) — no deps, can parallelize
 2. P1-009 (Group C): Evidence manifest template — no deps
 3. P1-014, P1-015 (Group E): Runners — no deps
 4. P1-006 (Group C): Branch protection rulesets — in development, finish

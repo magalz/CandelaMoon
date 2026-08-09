@@ -1,0 +1,470 @@
+# syntax=docker/dockerfile:1
+#
+# Containerfile: candelamoon-android
+# ----------------------------------------------------------------------------
+# Role: Android build/test/lint/native-compile environment for the CandelaMoon
+# delivery pipeline. Used by every job in the per-commit, per-PR, nightly, and
+# release-candidate tiers (see ci-architecture.md § "Jobs" / "Pipeline Tiers").
+#
+# This file is the tracked, promoted, digest-pinned equivalent of the dev build
+# that validated P1-021 (Containerfile preserved at %TEMP%/opencode/p1-021/).
+# The dev Containerfile used the eclipse-temurin base image's default `ubuntu`
+# user; the spec calls for a non-root `builder` user (uid 1000) explicitly, so
+# this Containerfile creates that user.
+#
+# Governing docs (every RUN section links back to the doc that defines it):
+#   - ci-architecture.md § "candelamoon-android" (image role definition)
+#   - ci-architecture.md § "Common conventions" (non-root user, mounts, network)
+#   - toolchain-pins.md (every version below is normative; bump pins together)
+#   - ADR 0014 (Podman-First Execution: rootless, digest-pinned, same image
+#     locally and in CI)
+#
+# Build context: the repo root. .containerignore at the repo root excludes
+# .git/, .maestro-space/, docs/handoffs/, build outputs, and other non-build
+# artifacts to keep the build context small.
+# ----------------------------------------------------------------------------
+
+# --- Base image -----------------------------------------------------------
+# Digest-pinned Eclipse Temurin 17 JDK (the AGP 8.13.0 + Gradle 8.13 toolchain
+# requires JDK 17; same major version the Windows host build uses via
+# appveyor.yml:11 JAVA_HOME=C:\Program Files\Java\jdk17).
+# Digest resolved via:
+#   podman pull docker.io/eclipse-temurin:17-jdk
+#   podman image inspect --format '{{index .RepoDigests 0}}' ...
+# Recorded in toolchain-pins.md "Container Base Images" / "JDK" sections.
+# Per toolchain-pins.md "Container Base Images" § "Resolution procedure".
+# Per ADR 0014 (digest-pinned bases give bit-reproducible images).
+FROM docker.io/eclipse-temurin:17-jdk@sha256:23441a35a47dca0fdd77b1b406adc1f86f29d042033ca9fece736a2633f8ba43
+
+# --- Reproducibility knobs ------------------------------------------------
+# Fixed epoch so the layer content is deterministic across rebuilds. Used by
+# Gradle, sdkmanager, and the find/touch post-processing below. Per AC8
+# (reproducible builds).
+# 2025-01-01 00:00:00 UTC
+ENV SOURCE_DATE_EPOCH=1735689600 \
+    LC_ALL=C.UTF-8 \
+    LANG=C.UTF-8
+
+# --- Standard locations ---------------------------------------------------
+# ANDROID_HOME / ANDROID_SDK_ROOT: Android SDK install root (read by AGP, by
+# sdkmanager, by Gradle's Android plugin). Per ci-architecture.md
+# "candelamoon-android" § "Run-time mounts": $ANDROID_HOME is a mounted cache
+# volume named `android-sdk` in CI, but the image ships a complete SDK on disk
+# so the first run is also offline-capable.
+# ANDROID_NDK_HOME: NDK install root. The project's native OpenSSL helper
+# resolves the toolchain at
+# $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin (B-18).
+# GRADLE_USER_HOME: pre-warmed cache location. The image pre-downloads the
+# Gradle 8.13 distribution and Robolectric JARs here so project `./gradlew`
+# runs and the first Robolectric unit test are network-free.
+# HOME: pinned to the builder home so shell tools that resolve ~ / $HOME
+# (Maven's local repo under $HOME/.m2, the native helper's ~/openssl) always
+# land on the baked files regardless of the OCI launcher (BER-006, B-14).
+# NOTE: Buildah/podman expands ${VAR} only from *previous* ENV instructions,
+# not from earlier entries of the same instruction. ANDROID_NDK_HOME must
+# therefore be declared in its own ENV after ANDROID_HOME, or it would
+# resolve to /ndk/27.0.12077973 (verified empirically on podman 5.8.3).
+ENV ANDROID_HOME=/opt/android-sdk \
+    ANDROID_SDK_ROOT=/opt/android-sdk
+ENV ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/27.0.12077973 \
+    GRADLE_USER_HOME=/home/builder/.gradle \
+    HOME=/home/builder \
+    JAVA_HOME=/opt/java/openjdk
+
+# --- OS-level helpers -----------------------------------------------------
+# unzip/wget: pull and unpack cmdline-tools and Gradle distributions.
+# ca-certificates: TLS verification when downloading from dl.google.com and
+# services.gradle.org.
+# git: needed by AGP/Gradle for some dependency-resolution paths and by
+# developers who shell into the container.
+# The apt cache is purged in the same RUN so this layer is deterministic.
+# DEBIAN_FRONTEND=noninteractive: no package-configuration prompts in a
+# non-interactive build (B-02). Acquire::Retries=3: transient mirror/network
+# failures retry instead of aborting the build (B-02).
+# APT inputs are versioned implicitly by the base image digest: the
+# eclipse-temurin base pins its own apt sources and package revisions, so the
+# installed package set cannot drift for a pinned base. Full apt snapshotting
+# (e.g. a snapshot-pinning apt proxy) is a deferred follow-up (BER-002,
+# TODO(P1-001-followup)).
+RUN DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 update \
+    && DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+        ca-certificates \
+        git \
+        unzip \
+        wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Android command-line tools 16.0 (build 13114758) ---------------------
+# Pinned at the concrete build number (13114758) per toolchain-pins.md
+# "Android SDK" § "Exact versions": cmdline-tools 16.0 corresponds to this
+# zip on dl.google.com. Pinning the build number (not just the major) prevents
+# SDK self-update drift between the image and cached $ANDROID_HOME volumes.
+# The cmdline-tools zip is extracted into $ANDROID_HOME/cmdline-tools/latest/
+# (the layout that AGP and sdkmanager expect; the zip ships a top-level
+# `cmdline-tools/` directory which we rename to `latest/`).
+# Rebuilds and base-image variants must not collide with a stale `latest/`
+# tree (B-06): it is removed before extraction, then unzip/mv run cleanly.
+# TODO(P1-001-followup): verify SHA-256 of commandlinetools-linux-13114758_latest.zip
+# before extraction (BER-001, B-03). HTTPS + the pinned build number are the
+# current integrity controls; checksum verification is deferred content work.
+RUN wget -q --tries=3 --timeout=60 \
+        https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip \
+        -O /tmp/cmdline-tools.zip \
+    && mkdir -p ${ANDROID_HOME}/cmdline-tools \
+    && rm -rf ${ANDROID_HOME}/cmdline-tools/latest \
+    && unzip -q /tmp/cmdline-tools.zip -d ${ANDROID_HOME}/cmdline-tools \
+    && mv ${ANDROID_HOME}/cmdline-tools/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest \
+    && rm /tmp/cmdline-tools.zip
+
+# --- Pre-accept Android SDK licenses --------------------------------------
+# All SDK licenses accepted at image build time so the runtime never needs
+# network for license acceptance. Per toolchain-pins.md "Android SDK"
+# § "Licenses": "the license acceptance is part of the image layer so
+# runtime steps run network-free."
+#
+# Deviation from the naive `yes | sdkmanager --licenses` form: in this base
+# image `yes` dies with SIGPIPE (exit 141) as soon as sdkmanager stops
+# reading stdin, so `set -o pipefail` would FAIL the pipeline even on a
+# successful acceptance (verified: PIPESTATUS 141 0). Instead we pre-write a
+# fixed acceptance stream to a regular file and redirect sdkmanager's stdin
+# from it; sdkmanager's own exit status is then authoritative, and two
+# postconditions below prove acceptance actually happened (B-07):
+#   1. sdkmanager printed its final "All SDK package licenses accepted"
+#      confirmation (string confirmed present in LicensesAction.class of
+#      cmdline-tools 16.0 build 13114758), and
+#   2. the license file android-sdk-license exists under $ANDROID_HOME/licenses.
+RUN set -eux; \
+    yes | head -n 200 > /tmp/sdk-licenses-accept.txt; \
+    ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \
+        --sdk_root=${ANDROID_HOME} --licenses \
+        < /tmp/sdk-licenses-accept.txt > /tmp/sdk-licenses.log 2>&1; \
+    grep -q "All SDK package licenses accepted" /tmp/sdk-licenses.log \
+        || { echo "ERROR: sdkmanager did not confirm license acceptance; log:" >&2; \
+             cat /tmp/sdk-licenses.log >&2; exit 1; }; \
+    test -s ${ANDROID_HOME}/licenses/android-sdk-license \
+        || { echo "ERROR: license files not written under ${ANDROID_HOME}/licenses" >&2; exit 1; }; \
+    rm -f /tmp/sdk-licenses-accept.txt /tmp/sdk-licenses.log
+
+# --- Install pinned SDK components ----------------------------------------
+# Per toolchain-pins.md "Android SDK" / "NDK" / "CMake and Ninja":
+#   - platform-tools 37.0.1: sdkmanager has no versioned package ID for
+#     platform-tools (repository2-3.xml ships only the unversioned
+#     `platform-tools` path, currently revision 37.0.1), so the bare package
+#     floats to whatever the repository serves (BER-003). To lock the exact
+#     version, we download the versioned archive platform-tools_r37.0.1-linux.zip
+#     directly (the same archive sdkmanager would resolve) and verify its
+#     SHA-1 from the repository XML before extraction.
+#   - platforms;android-36 (matches compileSdk=36 in app/build.gradle:7)
+#   - build-tools;36.0.0
+#   - ndk;27.0.12077973 (matches ndkVersion in app/build.gradle:4)
+#   - cmake;3.22.1 (NDK-bundled CMake; pinning the SDK package version here
+#     guarantees the same CMake that NDK r27 expects). Ninja ships inside
+#     the NDK's cmake package at $ANDROID_HOME/cmake/<ver>/bin/ninja.
+# Per ci-architecture.md "candelamoon-android" § "Installed tools" / "Build-
+# time network": dl.google.com is the only network this RUN requires.
+# `timeout 600` bounds the sdkmanager JVM (sdkmanager itself has no --timeout
+# option; verified in cmdline-tools 16.0 build 13114758) so a stalled SDK
+# repository cannot hang the build (B-02).
+# TODO(P1-001-followup): verify SHA-256 (beyond the XML-published SHA-1) of
+# platform-tools_r37.0.1-linux.zip; SHA-256 verification of all downloads is
+# deferred content work (BER-001, B-03).
+RUN timeout 600 ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \
+        --sdk_root=${ANDROID_HOME} > /dev/null \
+        "platforms;android-36" \
+        "build-tools;36.0.0" \
+        "ndk;27.0.12077973" \
+        "cmake;3.22.1" \
+    && wget -q --tries=3 --timeout=60 \
+        https://dl.google.com/android/repository/platform-tools_r37.0.1-linux.zip \
+        -O /tmp/platform-tools.zip \
+    && echo "477254aa5f903c15cf51001717bdf347fb6b53e0  /tmp/platform-tools.zip" \
+        | sha1sum -c - \
+    && unzip -q /tmp/platform-tools.zip -d ${ANDROID_HOME} \
+    && rm /tmp/platform-tools.zip
+
+# --- Non-root builder user (uid/gid 1000) ---------------------------------
+# Per ci-architecture.md "Common conventions (applied to every image)":
+# "user `builder`, uid/gid 1000; `USER builder` as the final directive in
+# every Containerfile. All cache/output mounts are `chown builder:builder`
+# at creation." This matches the host's runner user so `--userns=keep-id`
+# (rootless Podman) gives 1:1 UID mapping on Linux runners.
+#
+# The eclipse-temurin base image ships an `ubuntu` user with uid/gid 1000 by
+# default. Rename it to `builder` rather than creating a parallel account:
+# keeping a single uid-1000 account avoids permission confusion and matches
+# the `builder` user referenced throughout ci-architecture.md.
+#
+# Every branch below converges on the same postcondition, asserted at the
+# end of the RUN: builder exists with uid=1000 and gid=1000, home
+# /home/builder is owned by builder and carries the owner-write bit. The
+# contract is enforced, not assumed (BER-010) — a base-image change that
+# breaks it fails the build loudly instead of silently mis-mapping
+# permissions. No `su`/PAM dependency: ownership and mode are validated
+# with stat/find, which cannot lie about the real identity (B-08, B-09).
+RUN set -eux; \
+    if getent passwd builder >/dev/null; then \
+        # builder already exists: validate its identity, never trust it
+        # (B-08, B-09). Wrong uid/gid means rootless keep-id and the CI
+        # cache mounts will mis-map — fail the build.
+        [ "$(id -u builder)" = "1000" ] || { echo "ERROR: builder uid is $(id -u builder), expected 1000" >&2; exit 1; }; \
+        [ "$(id -g builder)" = "1000" ] || { echo "ERROR: builder gid is $(id -g builder), expected 1000" >&2; exit 1; }; \
+        # STR-08: uid/gid identity alone does not prove the account is
+        # unprivileged — a base-supplied builder can keep privileged
+        # supplementary groups (sudo, docker, disk, device, ...) or a
+        # sudoers rule. Normalize the account and fail closed.
+        # 1) Force the primary group to GID 1000 (self-heals a base that
+        #    drifted the group; tolerant when it already holds gid 1000).
+        usermod --gid 1000 builder 2>/dev/null || true; \
+        # 2) Replace the supplementary-group list with exactly "builder" so
+        #    no adm/sudo/video/... membership survives (B-10, STR-08).
+        usermod --groups builder builder; \
+        # 3) Lock the password: builder is a service account — no
+        #    password-based or interactive login (STR-08).
+        usermod --lock builder; \
+        # 4) Assert the normalization held: id -G must contain ONLY gid 1000.
+        [ "$(id -G builder)" = "1000" ] \
+            || { echo "ERROR: builder retains supplementary groups: $(id -G builder)" >&2; exit 1; }; \
+        # 5) Fail closed if a sudoers rule names builder or %builder.
+        ! grep -rq '^builder\b\|^%builder\b' /etc/sudoers /etc/sudoers.d/ 2>/dev/null \
+            || { echo "ERROR: builder has sudoers entries" >&2; exit 1; }; \
+    elif getent passwd ubuntu >/dev/null; then \
+        # Rename the base's ubuntu account. Tolerate a primary group that
+        # is not literally named "ubuntu" (rename whatever it is); if a
+        # group named builder already exists, keep it and continue.
+        usermod -l builder ubuntu; \
+        if ! getent group builder >/dev/null; then \
+            groupmod -n builder "$(id -gn builder)"; \
+        fi; \
+        usermod -d /home/builder -m builder; \
+        usermod -c "CandelaMoon builder" builder; \
+        # Strip the base image's supplementary groups (adm, sudo, video,
+        # dialout, ...): builder must be unprivileged per ci-architecture.md
+        # (B-10). usermod -G sets the supplementary list to exactly
+        # "builder".
+        usermod -G builder builder; \
+        # STR-08 consistency with the existing-builder branch: lock the
+        # password (the supplementary-group strip above via `usermod -G
+        # builder` is the same operation as `usermod --groups builder`).
+        usermod --lock builder; \
+        # The base's subordinate-ID ranges still name `ubuntu` after the
+        # rename; rewrite them so nested rootless tooling finds builder's
+        # ranges (B-10).
+        if [ -f /etc/subuid ]; then sed -i 's/^ubuntu:/builder:/' /etc/subuid; fi; \
+        if [ -f /etc/subgid ]; then sed -i 's/^ubuntu:/builder:/' /etc/subgid; fi; \
+    else \
+        # Neither ubuntu nor builder exists: create the account from
+        # scratch with the exact contract uid/gid 1000.
+        groupadd --gid 1000 --system builder; \
+        useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash --no-log-init builder; \
+    fi; \
+    # Postcondition: the uid/gid 1000 contract holds on every branch
+    # (BER-010).
+    [ "$(id -u builder)" = "1000" ] || { echo "ERROR: builder uid is $(id -u builder), expected 1000" >&2; exit 1; }; \
+    [ "$(id -g builder)" = "1000" ] || { echo "ERROR: builder gid is $(id -g builder), expected 1000" >&2; exit 1; }; \
+    # Home must exist, be owned by builder (uid 1000), and carry the
+    # owner-write bit: GRADLE_USER_HOME, the Maven local repo, and the
+    # sdkmanager caches live here (B-09, BER-011).
+    mkdir -p /home/builder; \
+    chown -R builder:builder /home/builder; \
+    [ "$(stat -c %u /home/builder)" = "1000" ] \
+        || { echo "ERROR: /home/builder owner is $(stat -c %u /home/builder), expected 1000" >&2; exit 1; }; \
+    find /home/builder -maxdepth 0 -perm -u+w -print -quit | grep -q . \
+        || { echo "ERROR: /home/builder not writable by its owner" >&2; exit 1; }
+
+# --- Pre-download Gradle 8.13 distribution --------------------------------
+# Per ci-architecture.md "candelamoon-android" § "Installed tools":
+# "Gradle 8.13 (distribution pre-downloaded into `GRADLE_USER_HOME` at build
+# time so builds run offline)."
+# Strategy: download the distribution once, extract it to /opt/gradle/ (so
+# the `gradle` CLI is also available in the image), then copy + extract it
+# into the wrapper cache at
+# $GRADLE_USER_HOME/wrapper/dists/gradle-8.13-bin/<hash>/ that the
+# project's `./gradlew` expects.
+# Source URL: https://services.gradle.org/distributions/gradle-8.13-bin.zip
+# (mirrored in toolchain-pins.md "Gradle" § "Exact versions"; SHA-256 of the
+# zip will be recorded there at Phase 1).
+# TODO(P1-001-followup): verify SHA-256 of gradle-8.13-bin.zip before
+# extraction (BER-001, BER-020, B-03). Gradle publishes SHA-256 for every
+# distribution; recording it in toolchain-pins.md and checking it here is
+# deferred content work.
+#
+# Wrapper-cache hash derivation (the wrapper's PathAssembler computes
+# `<hash>` as `BigInteger(MD5(distributionUrl)).toString(36)`):
+#   Python 3.13+:
+#     import hashlib
+#     h = int(hashlib.md5(
+#         b"https://services.gradle.org/distributions/gradle-8.13-bin.zip"
+#     ).hexdigest(), 16)
+#     digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+#     s = ""
+#     while h > 0:
+#         s = digits[h % 36] + s; h //= 36
+#     print(s)  # -> 5xuhj0ry160q40clulazy9h7d
+# If the distributionUrl in gradle/wrapper/gradle-wrapper.properties
+# changes, recompute the hash and update HASH below in lockstep.
+RUN set -eux; \
+    HASH="5xuhj0ry160q40clulazy9h7d"; \
+    GRADLE_DIST_DIR="${GRADLE_USER_HOME}/wrapper/dists/gradle-8.13-bin/${HASH}"; \
+    mkdir -p /opt/gradle "${GRADLE_DIST_DIR}"; \
+    wget -q --tries=3 --timeout=120 \
+        https://services.gradle.org/distributions/gradle-8.13-bin.zip \
+        -O /tmp/gradle-8.13-bin.zip; \
+    # 1) Install the gradle CLI for direct invocation \
+    unzip -q /tmp/gradle-8.13-bin.zip -d /opt/gradle; \
+    # 2) Populate the wrapper cache so ./gradlew finds the distribution \
+    #    without hitting services.gradle.org at run time. \
+    cp /tmp/gradle-8.13-bin.zip "${GRADLE_DIST_DIR}/gradle-8.13-bin.zip"; \
+    unzip -q /tmp/gradle-8.13-bin.zip -d "${GRADLE_DIST_DIR}"; \
+    touch "${GRADLE_DIST_DIR}/gradle-8.13-bin.zip.ok"; \
+    rm /tmp/gradle-8.13-bin.zip
+
+# --- Pre-fetch Robolectric android-all-instrumented JARs ------------------
+# Per ci-architecture.md "candelamoon-android" § "Installed tools":
+# "Robolectric: `android-all` jars pre-fetched into the Gradle cache at build
+# time (otherwise the first unit-test run hits the network)."
+#
+# Robolectric's MavenDependencyResolver caches its android-all-instrumented
+# JARs in $HOME/.m2/repository/ (the standard Maven local repository), not
+# in $GRADLE_USER_HOME/caches/. The artifact coordinate and version for each
+# Android API level are determined by Robolectric's own SDK mapping
+# (DefaultSdkProvider.java in robolectric-4.16). For each API level the
+# project tests against (minSdk 28..compileSdk 36 per ADR 0007 +
+# app/build.gradle:7,11,13), we pre-place the JAR in the local repo so the
+# first test run is network-free.
+#
+# API 21-27 gap (B-11, intentional): app/build.gradle still declares
+# minSdk 21, but ADR 0007 raises the floor to minSdk 28 and the existing
+# dev Containerfile/test suite only exercise API 28+; Robolectric 4.16's
+# published android-all-instrumented set starts at API 28, so no 21-27 JARs
+# are prefetched. A test that explicitly requests @Config(sdk < 28) before
+# the minSdk migration would need network access at run time. Revisit this
+# list when the minSdk bump lands.
+#
+# Versions below match Robolectric 4.16's published mapping:
+#   API 28 (P)            -> 9-robolectric-4913185-2-i7
+#   API 29 (Q)            -> 10-robolectric-5803371-i7
+#   API 30 (R)            -> 11-robolectric-6757853-i7
+#   API 31 (S)            -> 12-robolectric-7732740-i7
+#   API 32 (Sv2)          -> 12.1-robolectric-8229987-i7
+#   API 33 (T)            -> 13-robolectric-9030017-i7
+#   API 34 (U)            -> 14-robolectric-10818077-i7  (project's targetSdk)
+#   API 35 (V)            -> 15-robolectric-13954326-i7
+#   API 36 (Baklava)      -> 16-robolectric-13921718-i7   (project's compileSdk)
+# Source: https://github.com/robolectric/robolectric/blob/robolectric-4.16/robolectric/src/main/java/org/robolectric/plugins/DefaultSdkProvider.java
+#
+# If Robolectric is bumped past 4.16, re-check DefaultSdkProvider for the
+# new mapping and update this list in lockstep.
+# TODO(P1-001-followup): verify SHA-256 of each android-all-instrumented
+# JAR (BER-001, B-03); Maven Central publishes checksums in .sha1/.sha256
+# sidecar files. Deferred content verification.
+RUN set -eux; \
+    mkdir -p /home/builder/.m2/repository/org/robolectric/android-all-instrumented; \
+    # Count of JARs that are missing or corrupt; the loop logs individual
+    # failures and continues, then fails once at the end (B-12): one bad
+    # API must not prevent the remaining JARs from being prefetched. \
+    missing=0; \
+    for v in \
+        9-robolectric-4913185-2-i7 \
+        10-robolectric-5803371-i7 \
+        11-robolectric-6757853-i7 \
+        12-robolectric-7732740-i7 \
+        12.1-robolectric-8229987-i7 \
+        13-robolectric-9030017-i7 \
+        14-robolectric-10818077-i7 \
+        15-robolectric-13954326-i7 \
+        16-robolectric-13921718-i7 \
+    ; do \
+        jar="android-all-instrumented-${v}.jar"; \
+        dir="/home/builder/.m2/repository/org/robolectric/android-all-instrumented/${v}"; \
+        mkdir -p "${dir}"; \
+        if [ ! -s "${dir}/${jar}" ]; then \
+            echo "fetching ${jar}"; \
+            # Atomic download: write to .tmp then rename, so a partial \
+            # write on transient network failure does not leave a corrupt \
+            # final file. A failed download is logged and counted, not \
+            # fatal to the loop (B-12). \
+            if ! wget -q --tries=3 --timeout=120 \
+                    "https://repo1.maven.org/maven2/org/robolectric/android-all-instrumented/${v}/${jar}" \
+                    -O "${dir}/${jar}.tmp"; then \
+                echo "WARNING: download failed for ${jar}; continuing with remaining APIs" >&2; \
+                rm -f "${dir}/${jar}.tmp"; \
+                missing=$((missing + 1)); \
+                continue; \
+            fi; \
+            mv "${dir}/${jar}.tmp" "${dir}/${jar}"; \
+        fi; \
+        # Validate the JAR is a well-formed ZIP archive. This rejects \
+        # HTML error pages served with HTTP 200, directories, and \
+        # truncated downloads that [ -s ] alone would accept (B-12). \
+        if ! unzip -tq "${dir}/${jar}" > /dev/null 2>&1; then \
+            echo "ERROR: corrupt JAR ${jar}" >&2; \
+            missing=$((missing + 1)); \
+        fi; \
+    done; \
+    # Fail at the end if any API-level JAR is missing or corrupt (B-12): \
+    # the image must never ship a partial Robolectric set as if complete. \
+    if [ "${missing}" -gt 0 ]; then \
+        echo "ERROR: ${missing} Robolectric JAR(s) missing or corrupt; aborting" >&2; \
+        exit 1; \
+    fi
+
+# --- Permissions: root-owned tool trees, builder-owned runtime caches ------
+# Per ci-architecture.md "Common conventions": "All cache/output mounts are
+# `chown builder:builder` at creation." Same rule for the on-disk copies
+# baked into the image: every cache directory the container will write to at
+# run time must be owned by builder.
+# Per STR-06: baked tool trees are root-owned and read-only for builder.
+# This prevents a compromised PR build from overwriting SDK, NDK, or Gradle
+# binaries that could then execute in a trusted CI job via cache reuse.
+# /home/builder stays builder-owned for Gradle/Maven runtime caches.
+RUN chown -R root:root /opt/android-sdk /opt/gradle \
+    && find /opt/android-sdk /opt/gradle -type d -exec chmod go-w {} + \
+    && find /opt/android-sdk /opt/gradle -type f -exec chmod go-w {} + \
+    && chown -R builder:builder /home/builder
+
+# --- Normalize file mtimes to SOURCE_DATE_EPOCH for reproducibility --------
+# sdkmanager and Gradle set mtimes to "now" when extracting archives. For
+# reproducible image digests across rebuilds (AC8), retouch every file and
+# directory we downloaded or extracted, regardless of its original
+# timestamp. We skip the JDK install under /opt/java (owned by the base
+# image) since it's already deterministic for a given base digest.
+# No `-newer /etc/hostname` filter — that marker is engine-managed and
+# unstable, so it cannot anchor a reproducibility check (BER-012) — and no
+# error suppression: if touch fails, the build fails, which signals a real
+# problem rather than silently shipping non-reproducible layers (BER-013,
+# B-20).
+RUN find /opt/android-sdk /opt/gradle /home/builder \
+        -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +
+
+# --- Create /workspace before dropping privileges -------------------------
+# Per ci-architecture.md "Common conventions" § "Source mount": the repo is
+# bind-mounted at /workspace at run time. Create and own the directory
+# while still root: the unprivileged builder user cannot create it under /
+# (BER-011). `WORKDIR` below then never fails, with or without the bind
+# mount (e.g. ad-hoc `podman run` invocations).
+RUN mkdir -p /workspace && chown builder:builder /workspace
+
+# --- Final runtime configuration ------------------------------------------
+# USER builder is the last USER directive per ci-architecture.md "Common
+# conventions". From this point on, all RUN/CMD/ENTRYPOINT run as the
+# unprivileged builder user.
+USER builder
+
+# PATH puts the NDK LLVM toolchain, NDK-bundled CMake/Ninja, platform-tools
+# (adb), sdkmanager, and the pre-installed Gradle CLI on the default search
+# path. JAVA_HOME is preserved from above so non-Gradle Java tools can be
+# invoked directly. The NDK and CMake entries are required by the project's
+# native OpenSSL helper, which resolves the compiler at
+# $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin, and by
+# direct ndk-build/cmake/ninja invocations (B-18).
+ENV PATH=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin:${ANDROID_HOME}/cmake/3.22.1/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/cmdline-tools/latest/bin:/opt/gradle/gradle-8.13/bin:${PATH}
+
+# WORKDIR is /workspace per ci-architecture.md "Common conventions" § "Source
+# mount": the repo is bind-mounted at /workspace at run time. The directory
+# was created (and chown'd to builder) before `USER builder` above.
+WORKDIR /workspace
+
+# Default command: keep the container alive for `podman run --rm ... bash`
+# style inspection. CI workflows always pass an explicit command, so this
+# is only the fall-through.
+CMD ["bash"]

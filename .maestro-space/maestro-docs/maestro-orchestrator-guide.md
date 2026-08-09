@@ -296,9 +296,49 @@ Decisions made during a session that affect future tasks must be propagated:
 2. **Scope changes**: Update task description and affected downstream tasks.
 3. **New tasks**: Append with next available P-ID. Do not renumber existing tasks.
 4. **Deferred findings**: Record as `known_debt`. Review at post-phase time.
+   For every finding routed `defer` during triage with severity `high` or `medium`,
+   Bernstein MUST create a GitHub issue per §8.2.1 below. `low` severity deferrals
+   may be created at Bernstein's discretion or deferred entirely.
 5. **ADR decisions**: Reference in the task file and notify downstream tasks.
 
-### 8.3 Pre-Session State Check
+### 8.2.1 GitHub Issue Creation from Deferred Findings
+
+After each task session's review triage (steps 5 and 8 of the task cycle), Bernstein
+creates GitHub issues for deferred findings. The issues serve as the durable, tracked
+backlog that survives across sessions and is visible to the human owner.
+
+**When to create an issue:**
+
+| Finding severity | Finding type | Action |
+|---|---|---|
+| `high` | Any (deferred, tech-debt, secops) | **MUST** create a GitHub issue |
+| `medium` | Any | **MUST** create a GitHub issue |
+| `critical` | Any | **MUST** create a GitHub issue — blocks the next phase |
+| `low` | Any | Bernstein's discretion; may skip |
+
+**Issue templates and labels:**
+
+| Finding origin | Template file | Title prefix | GitHub labels |
+|---|---|---|---|
+| Review Phase 1/2 — deferred (non-security, non-architectural) | `maestro-templates/issue-deferred.md` | `[Deferred.P{N}.NN]` | `Deferred` + severity label (`Critical` / `High` / `Medium` / `Low`) |
+| Review Phase 1/2 — architectural or cross-cutting concern | `maestro-templates/issue-tech-debt.md` | `[Tech Debt.P{N}.NN]` | `Tech Debt` + severity label (`Critical` / `High` / `Medium` / `Low`) |
+| Review Phase 2 — security finding (STR-xxx) | `maestro-templates/issue-secops.md` | `[SecOps.P{N}.NN]` | `SecOps` + severity label (`Critical` / `High` / `Medium` / `Low`) |
+| Any source — blocks next phase | `maestro-templates/issue-deferred.md` (add Critical label) | `[Critical.P{N}.NN]` | `Critical` + severity label
+
+**Numbering**: `NN` is a sequential counter within the phase, shared across all issue
+types. Gaps are tolerated. Bernstein tracks the next available `NN` in the phase plan.
+
+**Issue content**: Each issue follows its template and is self-contained — an
+individual agent in a new context can pick it up with no additional conversation
+history. The issue body MUST reference the source task (P-ID), the source findings
+file, and the relevant finding IDs.
+
+**Recording**: After creation, Bernstein records the GitHub issue URL in the
+relevant `known_debt` entry and in the session handout's Known Debt table.
+
+**Scope**: This applies to findings deferred during task sessions only. The
+post-phase session (§5 of `maestro-post-phase.md`) produces maintenance tasks
+from whole-phase analysis; those follow a separate numbering scheme (`M{N}-NNN`).
 
 Before dispatching, Bernstein checks:
 - The phase plan for the next `Pending` task.
