@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# validate-design - MVP design validator for candelamoon-docs
+# ----------------------------------------------------------------------------
+# Per ci-architecture.md § "candelamoon-docs" § "Installed tools":
+#   "design validator entrypoint (validate-design - schema validation of
+#    architecture schemas, ADR register, capability matrix, evidence
+#    manifest); ADR/capability-matrix validation scripts."
+#
+# MVP scope (P1-002): assert that every required tool is installed and
+# runnable, and exit non-zero if any tool is missing or broken. Real
+# validation against /workspace/docs content (architecture schemas, ADR
+# register, capability matrix, evidence manifest) is a P1-017 follow-up
+# task; this script is the placeholder that the follow-up will extend.
+#
+# Fail-closed contract: any missing or broken tool exits 1 and the script
+# prints an ERROR line per failing tool. The on-host caller (the
+# docs-validate CI job) treats a non-zero exit as a hard build failure.
+#
+# Network policy: this script is designed to run with --network=none at
+# run time (per ci-architecture.md § "candelamoon-docs" § "Run-time
+# network: none - all validation is file-based and offline"). It must
+# not make any network calls.
+#
+# Usage:
+#   validate-design              # concise (OK / ERROR lines only)
+#   validate-design --verbose    # also print version + path per tool
+# ----------------------------------------------------------------------------
+set -eu
+
+verbose=0
+if [ "${1:-}" = "--verbose" ]; then
+    verbose=1
+fi
+
+fail=0
+
+# report <label> <status> [details]
+# status: OK | ERROR
+report() {
+    local label=$1 status=$2 details=${3:-}
+    if [ "$status" = "OK" ]; then
+        if [ "$verbose" -eq 1 ]; then
+            printf '  [validate-design] OK:    %-22s %s\n' "$label" "$details"
+        else
+            printf 'OK: %s\n' "$label"
+        fi
+    else
+        printf 'ERROR: %s%s\n' "$label" "${details:+ ($details)}" >&2
+    fi
+}
+
+# check <label> <expected-regex> <command...>
+# Run the command; on success, run pattern against the output. On any
+# failure (non-zero exit, empty output, or pattern miss), record an
+# ERROR and bump `fail`. The condition guard suppresses `set -e` so the
+# whole script does not abort on the first miss.
+check() {
+    local label=$1 pattern=$2
+    shift 2
+    local out
+    if out=$("$@" 2>&1) && [ -n "$out" ] && printf '%s' "$out" | grep -qE "$pattern"; then
+        if [ "$verbose" -eq 1 ]; then
+            # Truncate the version / path line to a single line for log
+            # legibility; multi-line output is collapsed to the first line.
+            local first
+            first=$(printf '%s' "$out" | head -n 1)
+            report "$label" "OK" "$first"
+        else
+            report "$label" "OK"
+        fi
+    else
+        local first
+        first=$(printf '%s' "$out" | head -n 1)
+        if [ -z "$out" ]; then
+            report "$label" "ERROR" "command produced no output"
+        else
+            report "$label" "ERROR" "output did not match /$pattern/: $first"
+        fi
+        fail=1
+    fi
+}
+
+# --- Python 3.11 (from the base image, fixed by the digest pin) -----------
+# python3 prints "Python 3.11.15"; the leading "Python" is unique enough
+# to confirm the base image is the pinned 3.11-slim digest.
+check "python3"              'Python 3\.11'                  python3 --version
+
+# --- Node.js 22.x (from the official tarball, SHA-256 pinned) -------------
+# node prints "v22.23.2"; the leading "v22." pins the LTS major per
+# toolchain-pins.md § "Node.js 22 LTS".
+check "node"                 'v22\.'                         node --version
+
+# --- npm (sibling to node; --version exits 0 on modern npm) ---------------
+# npm prints just a version number ("10.9.8").
+check "npm"                  '[0-9]+\.[0-9]+\.[0-9]+'        npm --version
+
+# --- Python pip tools (per ci-architecture.md § "candelamoon-docs") -------
+# jsonschema, pyyaml, yamllint. Each is checked by importing the module
+# and printing its version via importlib.metadata (the deprecation-free
+# way to query a distribution's version in 3.11+). If the import fails
+# or the version is empty, the check fails. Patterns are unanchored so
+# a leading "deprecation warning" line on stderr does not break the
+# match (stderr is captured into the same `$out` because we run with
+# `2>&1`).
+check "jsonschema"           '[0-9]+\.[0-9]+'                python3 -c "import importlib.metadata as m; print(m.version('jsonschema'))"
+check "pyyaml"               '[0-9]+\.[0-9]+'                python3 -c "import importlib.metadata as m; print(m.version('PyYAML'))"
+# yamllint prints "yamllint 1.37.1" (with a leading product name); the
+# pattern matches anywhere in the line.
+check "yamllint"             '[0-9]+\.[0-9]+'                yamllint --version
+
+# --- npm global tools (per ci-architecture.md § "candelamoon-docs") -------
+# markdownlint-cli prints just a version ("0.45.0"); markdown-link-check
+# prints just a version ("3.13.7"). The unanchored [0-9]+.[0-9]+ pattern
+# is tolerant of future CLIs adding a product-name prefix.
+check "markdownlint"         '[0-9]+\.[0-9]+'                markdownlint --version
+check "markdown-link-check"  '[0-9]+\.[0-9]+'                markdown-link-check --version
+
+# --- Final summary --------------------------------------------------------
+if [ "$fail" -ne 0 ]; then
+    printf 'ERROR: design validator missing or broken tools (run with --verbose for details)\n' >&2
+    exit 1
+fi
+printf 'OK: all design validator tools present and runnable\n'
+exit 0
