@@ -158,6 +158,60 @@ RUN set -eux; \
 # and `npx` work directly) and for the final USER builder layer.
 ENV PATH=/opt/node/bin:${PATH}
 
+# --- Non-root builder user (uid/gid 1000) ---------------------------------
+# Per ci-architecture.md "Common conventions (applied to every image)":
+# "user `builder`, uid/gid 1000; `USER builder` as the final directive in
+# every Containerfile. All cache/output mounts are `chown builder:builder`
+# at creation." This matches the host's runner user so `--userns=keep-id`
+# (rootless Podman) gives 1:1 UID mapping on Linux runners, and matches
+# the same uid/gid as the candelamoon-android image (P1-001) so the
+# pip-cache and npm-cache volumes can be shared safely across images.
+#
+# The python:3.11-slim base does NOT ship a pre-existing uid-1000 user
+# (verified: `getent passwd 1000` returns nothing;
+# `getent passwd builder` returns nothing). We create the account from
+# scratch with the exact contract uid/gid 1000, which is simpler than
+# P1-001's rename-the-base-user logic (P1-001's eclipse-temurin base
+# ships an `ubuntu` user with uid 1000; this base ships nothing).
+#
+# Created BEFORE the pip section (SEC-02): pip's network retrieval must
+# run as builder, never as root, so the account must exist first.
+#
+# Every postcondition below is asserted, not assumed (BER-010): a
+# base-image change that breaks the contract fails the build loudly
+# instead of silently mis-mapping permissions. No `su`/PAM dependency:
+# ownership and identity are validated with `id`, which cannot lie about
+# the real identity (B-08, B-09).
+RUN set -eux; \
+    groupadd --gid 1000 --system builder; \
+    useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash --no-log-init builder; \
+    # Lock the password: builder is a service account — no password-based
+    # or interactive login (STR-08).
+    usermod --lock builder; \
+    # Replace the supplementary-group list with exactly "builder" so no
+    # inherited membership (adm, sudo, video, ...) survives (B-10, STR-08).
+    usermod -G builder builder; \
+    # Postcondition: uid/gid 1000 contract holds (BER-010).
+    [ "$(id -u builder)" = "1000" ] || { echo "ERROR: builder uid is $(id -u builder), expected 1000" >&2; exit 1; }; \
+    [ "$(id -g builder)" = "1000" ] || { echo "ERROR: builder gid is $(id -g builder), expected 1000" >&2; exit 1; }; \
+    [ "$(id -G builder)" = "1000" ] || { echo "ERROR: builder retains supplementary groups: $(id -G builder)" >&2; exit 1; }; \
+    # Fail closed if a sudoers rule names builder or %builder. Each path
+    # is tested explicitly (BAR-009): the previous `! grep -rq ... || ...`
+    # negated grep status 2 (missing/unreadable path) into success and
+    # skipped the error branch, so an absent /etc/sudoers.d/ silently
+    # proved nothing. Globs that match nothing stay literal and are
+    # skipped by the `[ -f ] || continue` guard; only existing regular
+    # files are grepped. (Single-line form: the RUN body is one
+    # backslash-continued shell line, so the loop cannot span lines.)
+    for f in /etc/sudoers /etc/sudoers.d/*; do [ -f "$f" ] || continue; if grep -q '^builder\b\|^%builder\b' "$f"; then echo "ERROR: builder has sudoers entries in $f" >&2; exit 1; fi; done; \
+    # Home must exist and be owned by builder (uid 1000); pip / npm
+    # runtimes resolve ~ to /home/builder and write to .cache/pip and .npm
+    # under it (B-09, BER-011).
+    mkdir -p /home/builder; \
+    chown -R builder:builder /home/builder; \
+    [ "$(stat -c %u /home/builder)" = "1000" ] \
+        || { echo "ERROR: /home/builder owner is $(stat -c %u /home/builder), expected 1000" >&2; exit 1; }
+
 # --- Python pip dependencies ----------------------------------------------
 # Per ci-architecture.md § "candelamoon-docs" § "Installed tools":
 #   "Python 3.11 + pinned pip deps (jsonschema, pyyaml, yamllint, link
@@ -169,28 +223,74 @@ ENV PATH=/opt/node/bin:${PATH}
 #  --python-platform x86_64-unknown-linux-gnu requirements.txt -o
 #  requirements.lock`; the resolved tree is also recorded in
 # toolchain-pins.md § "Python").
-# The install is deterministic and integrity-verified (B-06 / BAR-003 /
-# BAR-004):
+# The install is deterministic, integrity-verified, AND wheel-only
+# (SEC-02):
 #   --require-hashes: every downloaded artifact must match a recorded
 #     SHA-256 — a changed, yanked, or mirror-served wheel fails the build.
+#   --only-binary=:all: (BOTH commands): only prebuilt wheels are ever
+#     accepted. A source distribution (sdist) cannot satisfy the
+#     constraint, so pip can NEVER execute setup.py / a PEP 517 build
+#     backend — which would otherwise run as UID 0 before USER builder
+#     and give a malicious sdist root execution during the build
+#     (SEC-02).
 #   --no-deps: the lock already contains the complete transitive tree
 #     (attrs, jsonschema-specifications, pathspec, referencing, rpds-py,
 #     typing-extensions), so nothing is resolved against live PyPI
 #     metadata at build time.
-#   --no-cache-dir: build-only, keeps the pip layer small. The runtime
-#     pip cache lives in the pip-cache volume mounted at
-#     /home/builder/.cache/pip per ci-architecture.md "Common
-#     conventions" § "Cache mounts" (B-11 / BAR-013) — PIP_NO_CACHE_DIR
-#     is intentionally NOT exported as an ENV (see the ENV block above).
-# requirements.lock is COPY'd from the build context (the repo root), so
-# a dep bump lands in a separate image layer and re-keys the cache
+#   --no-cache-dir (BOTH commands): build-only, keeps the pip layer
+#     small and the image free of pip-cache content (which would vary
+#     between builds and defeat AC8). The runtime pip cache lives in the
+#     pip-cache volume mounted at /home/builder/.cache/pip per
+#     ci-architecture.md "Common conventions" § "Cache mounts"
+#     (B-11 / BAR-013) — PIP_NO_CACHE_DIR is intentionally NOT exported
+#     as an ENV (see the ENV block above).
+#
+# Root/builder split (SEC-02): all NETWORK retrieval runs as builder
+# (uid 1000), while the final INSTALL runs as root. A compromised or
+# malicious package parse can therefore never execute with build-time
+# root privileges; root only extracts the already-staged, hash-verified,
+# wheel-only artifacts into the image prefix (/usr/local). If a future
+# lock change yields no wheel for this platform, the download fails the
+# build (fail-closed) instead of silently falling back to an sdist.
+#
+# requirements.lock is COPY'd from the build context (the repo root) with
+# --chown=builder:builder so the unprivileged download phase can read it.
+# A dep bump lands in a separate image layer and re-keys the cache
 # automatically. Bump procedure: edit requirements.txt, regenerate the
 # lock, and update toolchain-pins.md § "Python" in the same change.
 # Build-time network endpoint: pypi.org / files.pythonhosted.org.
-COPY infra/containers/candelamoon-docs/requirements.lock /tmp/requirements.lock
+COPY --chown=builder:builder infra/containers/candelamoon-docs/requirements.lock /tmp/requirements.lock
+
+# Download phase (network, unprivileged): stage hash-verified wheels as
+# builder into a builder-owned wheelhouse. `pip download` under
+# --only-binary=:all: refuses sdists outright, so no package build code
+# executes here; the wheelhouse is then asserted to contain ONLY .whl
+# files (non-empty, no strays) before root ever touches it.
+USER builder
 RUN set -eux; \
-    pip install --no-cache-dir --require-hashes --no-deps -r /tmp/requirements.lock; \
-    rm /tmp/requirements.lock
+    mkdir -p /tmp/pip-wheelhouse; \
+    python3 -m pip download --no-cache-dir --require-hashes --no-deps \
+        --only-binary=:all: -r /tmp/requirements.lock \
+        -d /tmp/pip-wheelhouse; \
+    [ "$(find /tmp/pip-wheelhouse -type f -name '*.whl' | wc -l)" -ge 1 ] \
+        || { echo "ERROR: pip wheelhouse is empty (no wheels downloaded)" >&2; exit 1; }; \
+    [ "$(find /tmp/pip-wheelhouse -type f | wc -l)" \
+        -eq "$(find /tmp/pip-wheelhouse -type f -name '*.whl' | wc -l)" ] \
+        || { echo "ERROR: pip wheelhouse contains non-.whl artifacts" >&2; exit 1; }
+
+# Install phase (offline, privileged): install the staged, verified
+# wheels only. --no-index + --find-links=/tmp/pip-wheelhouse means pip
+# can only see local wheels — no network, no live resolution; the
+# --only-binary=:all: and --require-hashes constraints stay on so a
+# future lock change fails closed here too. Cleanup removes both the
+# wheelhouse and the lock so neither leaks into the image.
+USER root
+RUN set -eux; \
+    python3 -m pip install --no-cache-dir --require-hashes --no-deps \
+        --only-binary=:all: --no-index \
+        --find-links=/tmp/pip-wheelhouse \
+        -r /tmp/requirements.lock; \
+    rm -rf /tmp/pip-wheelhouse /tmp/requirements.lock
 
 # --- markdownlint-cli + markdown-link-check (npm) -------------------------
 # Per ci-architecture.md § "candelamoon-docs" § "Installed tools":
@@ -244,57 +344,6 @@ RUN set -eux; \
 COPY infra/containers/candelamoon-docs/validate-design /usr/local/bin/validate-design
 RUN chmod 0755 /usr/local/bin/validate-design
 
-# --- Non-root builder user (uid/gid 1000) ---------------------------------
-# Per ci-architecture.md "Common conventions (applied to every image)":
-# "user `builder`, uid/gid 1000; `USER builder` as the final directive in
-# every Containerfile. All cache/output mounts are `chown builder:builder`
-# at creation." This matches the host's runner user so `--userns=keep-id`
-# (rootless Podman) gives 1:1 UID mapping on Linux runners, and matches
-# the same uid/gid as the candelamoon-android image (P1-001) so the
-# pip-cache and npm-cache volumes can be shared safely across images.
-#
-# The python:3.11-slim base does NOT ship a pre-existing uid-1000 user
-# (verified: `getent passwd 1000` returns nothing;
-# `getent passwd builder` returns nothing). We create the account from
-# scratch with the exact contract uid/gid 1000, which is simpler than
-# P1-001's rename-the-base-user logic (P1-001's eclipse-temurin base
-# ships an `ubuntu` user with uid 1000; this base ships nothing).
-#
-# Every postcondition below is asserted, not assumed (BER-010): a
-# base-image change that breaks the contract fails the build loudly
-# instead of silently mis-mapping permissions. No `su`/PAM dependency:
-# ownership and identity are validated with `id`, which cannot lie about
-# the real identity (B-08, B-09).
-RUN set -eux; \
-    groupadd --gid 1000 --system builder; \
-    useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash --no-log-init builder; \
-    # Lock the password: builder is a service account — no password-based
-    # or interactive login (STR-08).
-    usermod --lock builder; \
-    # Replace the supplementary-group list with exactly "builder" so no
-    # inherited membership (adm, sudo, video, ...) survives (B-10, STR-08).
-    usermod -G builder builder; \
-    # Postcondition: uid/gid 1000 contract holds (BER-010).
-    [ "$(id -u builder)" = "1000" ] || { echo "ERROR: builder uid is $(id -u builder), expected 1000" >&2; exit 1; }; \
-    [ "$(id -g builder)" = "1000" ] || { echo "ERROR: builder gid is $(id -g builder), expected 1000" >&2; exit 1; }; \
-    [ "$(id -G builder)" = "1000" ] || { echo "ERROR: builder retains supplementary groups: $(id -G builder)" >&2; exit 1; }; \
-    # Fail closed if a sudoers rule names builder or %builder. Each path
-    # is tested explicitly (BAR-009): the previous `! grep -rq ... || ...`
-    # negated grep status 2 (missing/unreadable path) into success and
-    # skipped the error branch, so an absent /etc/sudoers.d/ silently
-    # proved nothing. Globs that match nothing stay literal and are
-    # skipped by the `[ -f ] || continue` guard; only existing regular
-    # files are grepped. (Single-line form: the RUN body is one
-    # backslash-continued shell line, so the loop cannot span lines.)
-    for f in /etc/sudoers /etc/sudoers.d/*; do [ -f "$f" ] || continue; if grep -q '^builder\b\|^%builder\b' "$f"; then echo "ERROR: builder has sudoers entries in $f" >&2; exit 1; fi; done; \
-    # Home must exist and be owned by builder (uid 1000); pip / npm
-    # runtimes resolve ~ to /home/builder and write to .cache/pip and .npm
-    # under it (B-09, BER-011).
-    mkdir -p /home/builder; \
-    chown -R builder:builder /home/builder; \
-    [ "$(stat -c %u /home/builder)" = "1000" ] \
-        || { echo "ERROR: /home/builder owner is $(stat -c %u /home/builder), expected 1000" >&2; exit 1; }
-
 # --- Runtime cache directories (chown'd to builder) ------------------------
 # Per ci-architecture.md "Common conventions" § "Cache mounts":
 # `pip-cache:/home/builder/.cache/pip`, `npm-cache:/home/builder/.npm`.
@@ -339,8 +388,10 @@ RUN find /opt/node /usr/local /home/builder /workspace \
 
 # --- Final runtime configuration ------------------------------------------
 # USER builder is the last USER directive per ci-architecture.md "Common
-# conventions". From this point on, all RUN/CMD/ENTRYPOINT run as the
-# unprivileged builder user.
+# conventions". (Earlier in the file there are temporary USER switches in
+# the pip section — SEC-02: builder for the network download, root for
+# the offline wheel install — but from this point on, all RUN/CMD/
+# ENTRYPOINT run as the unprivileged builder user.)
 USER builder
 
 # WORKDIR is /workspace per ci-architecture.md "Common conventions"
