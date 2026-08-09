@@ -1,7 +1,7 @@
 # P1-010: Per-commit CI workflow
 
 **Phase**: Phase 1
-**Status**: In Development
+**Status**: Pending
 **Dependencies**: P1-001, P1-002, P1-003, P1-004, P1-005
 **Complexity**: L
 **Related ADRs**: 0014
@@ -56,3 +56,4 @@ secret scan, and JaCoCo coverage upload to Codecov.
 | Session Date | Status Change | Head SHA | PR URL | Handoff Path |
 |---|---|---|---|---|
 | 2026-08-06 | In Development (PR #3) | — | PR #3 | — |
+| 2026-08-09 | Reset to Pending (stale — no active session; pre-framework artifact; partial CI exists) | e26e9213 | — | — |

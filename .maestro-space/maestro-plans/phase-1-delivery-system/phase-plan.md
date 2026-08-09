@@ -8,7 +8,7 @@ workflows, self-hosted runners, and canary PR.
 design validator (P1-017) runs in CI.
 **Related ADRs**: 0013, 0014, 0015, 0019
 **Dependencies on previous phase**: Phase 0 complete.
-**Estimated task count**: 22 tasks (4 completed, 3 in development, 15 pending)
+**Estimated task count**: 22 tasks (4 completed, 0 in development, 18 pending)
 
 ---
 
@@ -33,16 +33,16 @@ design validator (P1-017) runs in CI.
 
 | # | ID | Title | Status | Depends On | Complexity | Evidence |
 |---|---|---|---|---|---|---|
-| 6 | P1-006 | GitHub branch protection rulesets | **In Development** | — | S | PR #3: CODEOWNERS (`* @magalz`), CI workflow exists. Rulesets pending. |
+| 6 | P1-006 | GitHub branch protection rulesets | Pending | — | S | PR #3: CODEOWNERS (`* @magalz`), CI workflow exists. Rulesets pending (stale pre-framework — reset 2026-08-09). |
 | 7 | P1-007 | PR template with task/phase/evidence fields | **Completed** | — | S | `.github/PULL_REQUEST_TEMPLATE.md` exists with full content (AC, evidence, review stack, rollback). PR #3. |
-| 8 | P1-008 | Issue and milestone templates | **In Development** | — | S | `.github/ISSUE_TEMPLATE/` has bug_report, feature_request, config. Maestro-specific templates (deferred/tech-debt/secops) from `maestro-templates/` not yet added. |
+| 8 | P1-008 | Issue and milestone templates | Pending | — | S | `.github/ISSUE_TEMPLATE/` has bug_report, feature_request, config. Maestro-specific templates (deferred/tech-debt/secops) from `maestro-templates/` not yet added (stale pre-framework — reset 2026-08-09). |
 | 9 | P1-009 | Evidence-manifest YAML template | Pending | — | S | — |
 
 ### Group D: CI Workflows (deps on Groups A+B)
 
 | # | ID | Title | Status | Depends On | Complexity | Evidence |
 |---|---|---|---|---|---|---|
-| 10 | P1-010 | Per-commit CI (lint, format, fast tests, docs validate, secret scan, Codecov) | **In Development** | P1-001..P1-005 | L | `ci.yml` exists: test job + JaCoCo + Codecov. Missing: lint, format, docs validate, secret scan. |
+| 10 | P1-010 | Per-commit CI (lint, format, fast tests, docs validate, secret scan, Codecov) | Pending | P1-001..P1-005 | L | `ci.yml` exists: test job + JaCoCo + Codecov. Missing: lint, format, docs validate, secret scan. Stale pre-framework — reset 2026-08-09. |
 | 11 | P1-011 | Per-PR CI (full tests, API-tier matrix, Memtrace sync) | Pending | P1-010 | L | — |
 | 12 | P1-012 | Nightly CI (emulator compat, dependency freshness, contract fixtures) | Pending | P1-010 | M | — |
 | 13 | P1-013 | Release-candidate CI (device tests, signing, provenance) | Pending | P1-010 | L | — |
@@ -111,11 +111,11 @@ P1-021 already completed (unblocks CI gate)
 
 ## Next Pending Tasks (in priority order)
 
-1. P1-003 → P1-004 (Group A): Remaining Containerfiles (security, luminal-contract) — no deps, can parallelize
+1. P1-003 → P1-004 (Group A): Remaining Containerfiles (security, luminal-contract) — no deps, ready NOW
 2. P1-022 (Group I): Dependency vulnerability remediation — depends on Group A, before P1-005
 3. P1-005 (Group B): Build and publish images to GHCR — depends on Group A + P1-022
-4. P1-009 (Group C): Evidence manifest template — no deps
-5. P1-014, P1-015 (Group E): Runners — no deps
-6. P1-006 (Group C): Branch protection rulesets — in development, finish
-7. P1-008 (Group C): Issue templates — in development, add maestro-specific
-8. P1-010 (Group D): Per-commit CI — in development, add lint/format/docs/security
+4. P1-008 (Group C): Issue templates — small, no deps, 3 maestro-specific templates to add
+5. P1-009 (Group C): Evidence manifest template — no deps
+6. P1-006 (Group C): Branch protection rulesets — GitHub settings/config task
+7. P1-014, P1-015 (Group E): Self-hosted runners — no deps
+8. P1-010 (Group D): Per-commit CI — add lint/format; full deps on P1-001..P1-005 for containerized jobs

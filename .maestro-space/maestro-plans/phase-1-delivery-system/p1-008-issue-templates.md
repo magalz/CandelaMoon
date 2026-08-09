@@ -1,7 +1,7 @@
 # P1-008: Add issue and milestone templates
 
 **Phase**: Phase 1
-**Status**: In Development
+**Status**: Pending
 **Dependencies**: none
 **Complexity**: S
 **Related ADRs**: 0015
@@ -43,3 +43,4 @@ intake for phase planning and audit tracking using the maestro tag nomenclature.
 | Session Date | Status Change | Head SHA | PR URL | Handoff Path |
 |---|---|---|---|---|
 | 2026-08-06 | In Development | — | PR #3 | — |
+| 2026-08-09 | Reset to Pending (stale — no active session; pre-framework artifact) | e26e9213 | — | — |

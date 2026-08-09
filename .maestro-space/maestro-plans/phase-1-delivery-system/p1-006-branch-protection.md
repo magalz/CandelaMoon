@@ -1,7 +1,7 @@
 # P1-006: Configure GitHub branch protection rulesets
 
 **Phase**: Phase 1
-**Status**: In Development
+**Status**: Pending
 **Dependencies**: none
 **Complexity**: S
 **Related ADRs**: 0013
@@ -51,3 +51,4 @@ required reviews, required statuses. Enforces the delivery-model commit gates.
 | Session Date | Status Change | Head SHA | PR URL | Handoff Path |
 |---|---|---|---|---|
 | 2026-08-06 | In Development (PR #3) | — | PR #3 | — |
+| 2026-08-09 | Reset to Pending (stale — no active session; pre-framework artifact) | e26e9213 | — | — |
