@@ -4,7 +4,7 @@
 - **Task**: P1-002 — Create candelamoon-docs Containerfile
 - **Branch**: `phase1/p1-002-candelamoon-docs-containerfile`
 - **Base SHA**: `86d3c216eb2539cec76556978cc7e36941dfaca8`
-- **Head SHA**: `425c17f536a92691b2bf50bb8a40d3d9bc9af1b5` (after source-files commit; handoff + activity report committed in the next commit)
+- **Head SHA**: `425c17f536a92691b2bf50bb8a40d3d9bc9af1b5` (source-files commit, `feat(infra): P1-002 candelamoon-docs Containerfile - digest-pinned base, Node.js 22.23.2, MVP design validator`; handoff + activity report committed in `4ead0667`)
 - **Date**: 2026-08-09
 - **Dispatched by**: Bernstein (orchestrator)
 - **task_id**: P1-002
