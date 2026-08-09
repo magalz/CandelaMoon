@@ -6,7 +6,7 @@ status: "green-verified"
 repository: "magalz/CandelaMoon"
 branch: "moonlight-noir"
 base_sha: "2118b61cd1dc49d600b36f06f7d832d5a7b8b824"
-head_sha: "ddf6d5c4900cc7b17422a1b459ef83b375767325"
+head_sha: "7731c4e7640ca6e09af80de8d62b661cd5f2510b"
 pr_url: ""
 acceptance_criteria:
   - "AC1: Containerfile exists at `infra/containers/candelamoon-android/Containerfile`."
@@ -134,8 +134,8 @@ review_phase_2:
       title: "Builder-writable tool trees and shared caches permit cross-trust poisoning"
       finding_ids: ["STR-06"]
       severity: "high (highest practical priority)"
-      disposition: "open — apply-now, separate dispatch"
-      detail: "Replace chown -R builder:builder /opt/android-sdk /opt/gradle with root-owned go-w tool trees (per Brahms' inline mitigation) and enforce read-only/trust-scoped caches in P1-010/P1-011. Brahms rates this the highest-priority practical control; NOT part of this STR-07/STR-08 dispatch — recommended as the next patch round."
+      disposition: "applied"
+      detail: "Baked tool trees are now root-owned and read-only for builder: the chown RUN was replaced with `chown -R root:root /opt/android-sdk /opt/gradle` + `find ... -type d/-type f -exec chmod go-w {} +` (execute/traversal bits untouched), keeping `chown -R builder:builder /home/builder` for Gradle/Maven runtime caches. Verified in-image (str06, id 6e1fa84379f2): /opt/android-sdk and /opt/gradle root:root 755, zero go-w dirs/files, zero non-root entries; builder `touch /opt/android-sdk/test_write` -> Permission denied; /home/builder writable by builder; adb executes (37.0.1-15733141); offline `./gradlew --version` -> Gradle 8.13 with the wrapper dist read from builder-owned /home/builder. NOTE: this supersedes the AC5 parenthetical (\"all SDK/cache directories chown'd to builder:builder\") — only /home/builder is builder-owned now. STR-06 CI-side enforcement (read-only/trust-scoped caches) remains with P1-010/P1-011; STR-10 (archive resource bounds) is the remaining open apply-now finding."
     - id: "STR-07"
       title: "Credential-bearing files should be excluded from the build context"
       finding_ids: ["STR-07"]
@@ -458,3 +458,68 @@ Full logs: `%TEMP%/opencode/p1-001-str08/` (micro-test containers + block script
 #### Handoff to
 
 Bernstein: Phase 2 security patches STR-07/STR-08 applied and green-verified (micro red-phase tests + full build + `--network=none` `id`). Phase 2 triage recorded for all ten STR findings. Recommended next round: STR-06 (apply-now, highest priority), then STR-10.
+
+### Bach — Senior Developer (2026-08-08) — STR-06 patch round
+
+#### Environment
+
+- Host: Windows 11 10.0.26200, WSL2 backend (podman-machine-default, 8 vCPU / 8 GiB RAM / 100 GiB disk)
+- Podman: 5.8.3 (rootless, WSL2); base image `docker.io/eclipse-temurin:17-jdk@sha256:23441a35...` cached locally (`--pull=never`)
+- Prior image for red-phase evidence: `localhost/candelamoon-android:phase2` (id `f039d5aeb08b...`)
+- Built image: `localhost/candelamoon-android:str06` (id `6e1fa84379f2b9fed351a552505f40afaa5fa4ce9dd07b0a4a3501ad6a41dccf`)
+
+#### Actions
+
+1. Read the handoff and the STR-06 entry in `review_phase_2.triaged_findings` (Brahms' highest-priority apply-now finding), plus the current Containerfile to locate the chown RUN.
+2. **Red-phase evidence collected against the pre-change image** (`phase2`): `/opt/android-sdk` and `/opt/gradle` were `builder:builder` and builder could `touch` files under `/opt/android-sdk` — the poisonable state STR-06 targets.
+3. **Pre-change tree audit** for the patch's `find -exec chmod go-w` passes: enumerated symlinks under the tool trees (35, all inside the two roots) and confirmed zero dangling symlinks, so no `chmod` error can fail the `&&` chain; `-type f`/`-type d` do not match symlinks, and `chmod go-w` preserves execute/traversal bits.
+4. **PATCH (STR-06)**: replaced `RUN chown -R builder:builder /opt/android-sdk /opt/gradle /home/builder` with the dispatched block — `chown -R root:root /opt/android-sdk /opt/gradle`, `find ... -type d -exec chmod go-w {} +`, `find ... -type f -exec chmod go-w {} +`, `chown -R builder:builder /home/builder` — plus updated the section header comment (root-owned tool trees, builder-owned runtime caches; ci-architecture.md + STR-06 citations).
+5. **Green phase**: `podman build --pull=never -t candelamoon-android:str06 -f infra/containers/candelamoon-android/Containerfile .` — 18/18 steps (steps 1-11 layer-cached; step 12 STR-06 RUN and steps 13-18 rebuilt), tagged successfully.
+6. Ran the dispatch verification and full regression suite under `--network=none` (see Verification table).
+7. Committed the code change (`7731c4e7`), then updated this handoff (`head_sha`, `review_phase_2.triaged_findings` STR-06 → applied, this section) and wrote the activity report (JSON + MD).
+
+#### Files
+
+- Modified: `infra/containers/candelamoon-android/Containerfile` — STR-06 permissions RUN (root-owned go-w tool trees; /home/builder stays builder-owned) + section comment
+- Modified: `.maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/handoff.md` — head_sha, STR-06 triaged finding → applied, this section
+- Created: `.maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/bach-senior-developer-activity-report-phase2b-str06.md` / `.json` — activity report
+- Test artifacts (outside the repo, `%TEMP%/opencode/p1-001-str06/`): wrapper files for the offline gradlew test
+
+#### Verification
+
+| Command | Expected | Observed |
+|---|---|---|
+| `podman build --pull=never -t candelamoon-android:str06 ...` | build succeeds | 18/18 steps, `Successfully tagged localhost/candelamoon-android:str06` (id `6e1fa84379f2...`); steps 1-11 cached, step 12 (STR-06) + 13-18 rebuilt |
+| `podman run --rm --network=none ... ls -la /opt/android-sdk/platform-tools/adb` | root:root, 755, executable | `-rwxr-xr-x 1 root root 10642368 ... adb` |
+| `podman run --rm --network=none ... /opt/android-sdk/platform-tools/adb version` | version output | `Android Debug Bridge version 1.0.41 / Version 37.0.1-15733141` |
+| `podman run --rm --network=none ... touch /opt/android-sdk/test_write 2>&1 \|\| echo "EXPECTED: cannot write"` | Permission denied + EXPECTED echo | `touch: cannot touch '/opt/android-sdk/test_write': Permission denied` + `EXPECTED: cannot write` |
+| `podman run --rm --network=none ... touch /home/builder/test_write && echo "OK: home writable"` | writable | `OK: home writable` |
+| `stat -c "%U:%G %a" /opt/android-sdk /opt/gradle /home/builder` | root:root 755 / root:root 755 / builder:builder | `root:root 755`, `root:root 755`, `builder:builder 750` |
+| `find /opt/android-sdk /opt/gradle -type d -perm /022 \| wc -l` | 0 | `0` (no group/other-writable dirs) |
+| `find /opt/android-sdk /opt/gradle -type f -perm /022 \| wc -l` | 0 | `0` (no group/other-writable files) |
+| `find /opt/android-sdk /opt/gradle -not -user root \| wc -l` | 0 | `0` (fully root-owned) |
+| `id` | uid=1000(builder) gid=1000(builder) groups=1000(builder) | `uid=1000(builder) gid=1000(builder) groups=1000(builder)` (regression) |
+| `java -version` | Temurin 17 | `openjdk 17.0.19` (regression) |
+| `sdkmanager --list` | 5 packages | `build-tools;36.0.0`, `cmake;3.22.1`, `ndk;27.0.12077973`, `platform-tools 37.0.1`, `platforms;android-36` (read-only SDK works) |
+| `gradle --version` | Gradle 8.13 | `Welcome to Gradle 8.13!` ... `Gradle 8.13` (CLI from read-only /opt/gradle) |
+| offline `./gradlew --version` (throwaway project, wrapper layout preserved, `--network=none`) | Gradle 8.13, no network | `Gradle 8.13`, `Kotlin: 2.0.21`, `Launcher JVM: 17.0.19` — dist resolved from builder-owned `/home/builder/.gradle/wrapper/dists/...` |
+| `stat -c %y` (adb, gradle, wrapper zip) | 2025-01-01 00:00:00 UTC | all `2025-01-01 00:00:00.000000000 +0000` (mtime normalization unaffected) |
+| `git diff` of patched file | only the STR-06 hunk | 9 insertions / 2 deletions (RUN + comment), nothing else |
+
+Full logs: `%TEMP%/opencode/p1-001-str06/` (wrapper files + gradlew test).
+
+#### Deviations
+
+1. **Test-layout fix, not an image defect** — the first offline `./gradlew --version` attempt failed (`Could not find or load main class`) because the wrapper files were copied flat; the Gradle wrapper script resolves `$APP_HOME/gradle/wrapper/gradle-wrapper.jar`, so the repo layout (`gradlew` + `gradle/wrapper/`) must be preserved. Re-ran with the correct layout: passes (same as the prior rounds' method).
+2. **Section comment updated alongside the RUN** — the old header ("Permissions: chown everything to builder") would have misdocumented the new block; the comment now states root-owned tool trees + builder-owned runtime caches, keeping the ci-architecture.md citation and the dispatch's STR-06 rationale verbatim.
+3. **AC5 parenthetical superseded** — AC5 as written says all of /opt/android-sdk, /opt/gradle, /home/builder are chown'd to builder; STR-06 intentionally changes the first two. The AC text is retained as the original acceptance record; the STR-06 triaged entry now records the supersession.
+
+#### Known Issues
+
+1. **STR-10 (archive resource bounds) remains OPEN** — the last apply-now finding from Brahms' Phase 2 triage; not part of this dispatch.
+2. **STR-01..STR-05 deferred to P1-005, STR-09 deferred to P1-010/P1-011** — unchanged; STR-06's CI-side cache enforcement (read-only/trust-scoped cache volumes) belongs to P1-010/P1-011 per Brahms.
+3. **Phase 1 known debt unchanged** — AC8 image-digest reproducibility, download SHA-256 TODOs, platform-tools 37.0.1 pin, Robolectric 4.16 mapping sensitivity (see prior sections).
+
+#### Handoff to
+
+Bernstein: STR-06 applied and green-verified (root-owned go-w tool trees; dispatch checks + full regression under `--network=none`, including offline gradlew). Remaining Phase 2 apply-now finding: STR-10 (archive resource bounds), suggested as the next patch round.
