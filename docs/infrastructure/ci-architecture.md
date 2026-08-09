@@ -126,6 +126,29 @@ Common metadata: all container jobs run on self-hosted Linux runners with rootle
 - **Outputs**: SARIF findings (uploaded as security artifact), secret-scan report, dependency-review report, license report
 - **Validates**: SAST findings (semgrep/bandit), dependency vulnerabilities (osv/pip-audit/npm audit), secrets (gitleaks), license compliance. Policy: PR tier fails on new HIGH/CRITICAL findings introduced by the diff; nightly fails on any HIGH/CRITICAL in the full tree.
 
+### 4a. mobsfscan (Android SAST)
+- **Image**: none — runs on GitHub-hosted runner directly | **Trigger**: PR (on changes to `app/src/**`, `app/build.gradle`)
+- **Inputs**: source tree (Android source + build files)
+- **Outputs**: SARIF findings (uploaded to GitHub Code Scanning tab)
+- **Validates**: Android-specific security issues — WebView SSL bypass, certificate pinning, root detection, tapjacking, insecure broadcast receivers, exported components, weak cryptography. Complements CodeQL's general Java/Kotlin queries with Android-specific checks.
+- **Workflow**: `.github/workflows/mobsfscan.yml`
+
+### 4b. secret-scan (TruffleHog)
+- **Image**: none — runs on GitHub-hosted runner directly | **Trigger**: push (`moonlight-noir`), PR
+- **Inputs**: full git history (`fetch-depth: 0`), commit range (`base..head`)
+- **Outputs**: scan results logged to workflow run; fails on verified live credentials
+- **Validates**: leaked credentials with active verification (800+ detectors). Unlike static regex matching, TruffleHog calls upstream APIs to confirm leaked keys are actually live. Complements the containerized gitleaks scan (job #4) which runs inside `candelamoon-security` when that image is built (P1-003).
+- **Workflow**: `.github/workflows/trufflehog.yml`
+- **Note**: This is a pre-container bridge — it runs on GitHub-hosted runners until the `candelamoon-security` image (P1-003) provides the containerized gitleaks scan. Both will coexist: TruffleHog for live credential verification, gitleaks for comprehensive regex-based scan.
+
+### 4c. dependency-review
+- **Image**: none — runs on GitHub-hosted runner directly | **Trigger**: PR
+- **Inputs**: PR diff, dependency graph
+- **Outputs**: dependency change report with vulnerability and license findings
+- **Validates**: every dependency change introduced by the PR — new/updated/removed packages checked against the GitHub Advisory Database. Fails on `high` severity vulnerabilities. Denies GPL-3.0 and AGPL-3.0 licensed dependencies. Complements the containerized dependency review (osv-scanner + trivy in candelamoon-security, P1-003).
+- **Workflow**: `.github/workflows/dependency-review.yml`
+- **Note**: First-party GitHub action; pre-container bridge until P1-003 lands. Will coexist with the image-based scan as a fast PR-time gate.
+
 ### 5. sbom-delta
 - **Image**: candelamoon-security | **Trigger**: PR, nightly
 - **Inputs**: source tree, lockfiles, previous SBOM (from last green run, stored as artifact)
@@ -171,7 +194,7 @@ Common metadata: all container jobs run on self-hosted Linux runners with rootle
 Define per-commit (formatting, lint, fast unit tests, docs validate, secret/dependency checks), per-PR (full tests, API-tier matrix, Memtrace review, acceptance/edge/blind/security reviews, SBOM delta, evidence audit), nightly (emulator/device compat, dependency freshness, contract fixtures, extended stream/reconnect tests), release-candidate (real Google TV Streamer + compat hardware, official host integration, long-session/fault tests, signed artifacts, provenance, SBOM, checksums, rollback rehearsal). Each tier: jobs included, triggers, timeout, cache policy, required artifacts.
 
 ### Per-commit
-- **Jobs**: lint-format, unit-tests (fast lane - JVM unit tests only), docs-validate, security-scan (fast lane - secret scan + dependency review only)
+- **Jobs**: lint-format, unit-tests (fast lane - JVM unit tests only), docs-validate, security-scan (fast lane - secret scan + dependency review only), mobsfscan (Android SAST), TruffleHog (secret verification), dependency-review (PR dependency gate)
 - **Triggers**: push to any branch (including PR branches). Always-blocking: a failed per-commit job blocks merge.
 - **Timeout**: 15 minutes total.
 - **Cache policy**: read-only. Caches are only *read* on this tier; misses are tolerated (image digest + lockfile + toolchain + arch key). No cache writes, no SBOM refresh.
