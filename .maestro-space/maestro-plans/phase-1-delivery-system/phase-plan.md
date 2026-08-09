@@ -8,7 +8,7 @@ workflows, self-hosted runners, and canary PR.
 design validator (P1-017) runs in CI.
 **Related ADRs**: 0013, 0014, 0015, 0019
 **Dependencies on previous phase**: Phase 0 complete.
-**Estimated task count**: 22 tasks (4 completed, 0 in development, 18 pending)
+**Estimated task count**: 22 tasks (4 completed, 1 in development, 17 pending)
 
 ---
 
@@ -20,7 +20,7 @@ design validator (P1-017) runs in CI.
 |---|---|---|---|---|---|---|
 | 1 | P1-001 | candelamoon-android Containerfile | **Completed** | — | M | Containerfile at `infra/containers/candelamoon-android/Containerfile`; green-verified 2026-08-08; review phases 1+2 closed; STR-06 applied. Handoff: `.maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/`. |
 | 2 | P1-002 | candelamoon-docs Containerfile | **Completed** | — | S | Containerfile at `infra/containers/candelamoon-docs/Containerfile`; green-verified 2026-08-09; review phases 1+2 closed; SEC-01 (workspace import isolation) + SEC-02 (wheel-only pip + builder-account split) applied. Handoff: `.maestro-space/maestro-works/phase-1-delivery-system/p1-002-candelamoon-docs-containerfile/`. |
-| 3 | P1-003 | candelamoon-security Containerfile | Pending | — | M | — |
+| 3 | P1-003 | candelamoon-security Containerfile | **In Development** | — | M | Handoff: `.maestro-space/maestro-works/phase-1-delivery-system/p1-003-candelamoon-security-containerfile/handoff.md` |
 | 4 | P1-004 | luminal-contract Containerfile | Pending | — | S | — |
 
 ### Group B: Image Publication (deps on Group A)
@@ -111,7 +111,8 @@ P1-021 already completed (unblocks CI gate)
 
 ## Next Pending Tasks (in priority order)
 
-1. P1-003 → P1-004 (Group A): Remaining Containerfiles (security, luminal-contract) — no deps, ready NOW
+1. P1-003 (Group A): candelamoon-security Containerfile — **IN DEVELOPMENT** (dispatched 2026-08-09)
+2. P1-004 (Group A): luminal-contract Containerfile — no deps, next up
 2. P1-022 (Group I): Dependency vulnerability remediation — depends on Group A, before P1-005
 3. P1-005 (Group B): Build and publish images to GHCR — depends on Group A + P1-022
 4. P1-008 (Group C): Issue templates — small, no deps, 3 maestro-specific templates to add
