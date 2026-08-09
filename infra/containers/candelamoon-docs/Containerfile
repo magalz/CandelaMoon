@@ -25,11 +25,22 @@
 #
 # Build context: the repo root. .containerignore at the repo root excludes
 # .git/, .maestro-space/, build outputs, and other non-build artifacts.
-# This Containerfile COPYs two small files from the build context:
-#   - infra/containers/candelamoon-docs/requirements.txt (pip deps)
+# This Containerfile COPYs four small files from the build context:
+#   - infra/containers/candelamoon-docs/requirements.lock (pip lock, hashed)
+#   - infra/containers/candelamoon-docs/package.json +
+#     package-lock.json (npm lock, integrity-hashed)
 #   - infra/containers/candelamoon-docs/validate-design (validator script)
 # Everything else is downloaded from the network at build time, so a
 # minimal .containerignore is sufficient (verified per AC9).
+#
+# Build-time network allowlist (AC5; documented inline at each install
+# step too):
+#   - pypi.org / files.pythonhosted.org  (pip install from the lock)
+#   - registry.npmjs.org                 (npm ci from package-lock.json)
+#   - nodejs.org                         (Node.js 22 LTS binary tarball)
+#   - deb.debian.org                     (apt-get update / install)
+# Run-time network is --network=none (ci-architecture.md §
+# "candelamoon-docs" § "Run-time network").
 # ----------------------------------------------------------------------------
 
 # --- Base image -----------------------------------------------------------
@@ -54,20 +65,23 @@ FROM docker.io/library/python:3.11-slim@sha256:78b39ef14d8e2b4d71f8dc304f1328c37
 # Fixed epoch so the layer content is deterministic across rebuilds. Used
 # by the find/touch post-processing below. Per AC8 (reproducible builds).
 # 2025-01-01 00:00:00 UTC
-# PIP_NO_CACHE_DIR=1 / PYTHONDONTWRITEBYTECODE=1 / PIP_DISABLE_PIP_VERSION_CHECK=1:
-# keep the pip build layer small and deterministic; runtime pip cache
-# lives in the pip-cache volume mounted at /home/builder/.cache/pip
-# (ci-architecture.md "Common conventions" § "Cache mounts").
+# PIP_DISABLE_PIP_VERSION_CHECK=1 / PYTHONDONTWRITEBYTECODE=1: keep the
+# pip build layer small and deterministic.
+# PIP_NO_CACHE_DIR is deliberately NOT set here: as an ENV it would
+# persist into the runtime image and disable the pip-cache volume
+# (/home/builder/.cache/pip) declared in ci-architecture.md "Common
+# conventions" § "Cache mounts" (B-11 / BAR-013). The build-only pip
+# install passes --no-cache-dir itself (see the pip section below);
+# runtime pip operations read/write the mounted cache.
 # PIP_ROOT_USER_ACTION=ignore: silences pip's "running as root" warning in
 # the build layer (we are root during the build; USER builder comes later).
 # NPM_CONFIG_UPDATE_NOTIFIER=false / NPM_CONFIG_FUND=false /
 # NPM_CONFIG_AUDIT=false: drop npm's network-dependent housekeeping
-# (update notifier, funding nag, audit). npm install -g still works.
+# (update notifier, funding nag, audit). npm install still works.
 ENV SOURCE_DATE_EPOCH=1735689600 \
     LC_ALL=C.UTF-8 \
     LANG=C.UTF-8 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_NO_CACHE_DIR=1 \
     PIP_ROOT_USER_ACTION=ignore \
     PYTHONDONTWRITEBYTECODE=1 \
     NPM_CONFIG_UPDATE_NOTIFIER=false \
@@ -83,21 +97,18 @@ ENV HOME=/home/builder
 # --- Pinned tool versions (single source of truth) -----------------------
 # Per ci-architecture.md § "candelamoon-docs" and toolchain-pins.md
 # § "Node.js 22 LTS" / "Python 3.11". These constants drive the Node.js
-# tarball download and the npm install lines below; bumping any of them
-# requires updating toolchain-pins.md and (for Node) the sha256 line in
-# lockstep.
+# tarball download below; bumping NODE_VERSION requires updating
+# toolchain-pins.md and the sha256 line in lockstep.
 #   NODE_VERSION 22.23.2: latest 22.x LTS security release (LTS line "Jod"),
 #     published 2026-07-28; recorded in toolchain-pins.md § "Node.js 22 LTS".
 #   NODE_SHA256_LINUX_X64: from https://nodejs.org/dist/v22.23.2/SHASUMS256.txt.
-#   MARKDOWNLINT_VERSION: markdownlint-cli (npm).
-#   MARKDOWN_LINK_CHECK_VERSION: markdown-link-check (npm), purpose-built
-#     for Markdown link validation. We choose this over pip's `linkchecker`
-#     because it pairs with markdownlint-cli on the same npm toolchain
-#     and has a smaller install footprint on the slim base.
+#   markdownlint-cli@0.45.0 / markdown-link-check@3.13.7: pinned in the
+#     adjacent package.json and locked (full transitive tree + integrity
+#     hashes) in package-lock.json — see the npm section below. Bumping
+#     either requires regenerating the lock and updating
+#     toolchain-pins.md § "Node" in the same change.
 ENV NODE_VERSION=22.23.2 \
-    NODE_SHA256_LINUX_X64=d60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307 \
-    MARKDOWNLINT_VERSION=0.45.0 \
-    MARKDOWN_LINK_CHECK_VERSION=3.13.7
+    NODE_SHA256_LINUX_X64=d60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307
 
 # --- OS-level helpers -----------------------------------------------------
 # ca-certificates: TLS verification for nodejs.org, pypi.org, files.pythonhosted.org.
@@ -151,43 +162,71 @@ ENV PATH=/opt/node/bin:${PATH}
 # Per ci-architecture.md § "candelamoon-docs" § "Installed tools":
 #   "Python 3.11 + pinned pip deps (jsonschema, pyyaml, yamllint, link
 #    checker e.g. linkchecker or markdown-link-check)"
-# Pinned by exact version in the adjacent requirements.txt. The image
-# deliberately uses --no-cache-dir (via PIP_NO_CACHE_DIR=1 above) so pip
-# does not write a per-layer cache that would inflate the image; the
-# runtime pip cache lives in the pip-cache volume mounted at
-# /home/builder/.cache/pip per ci-architecture.md "Common conventions"
-# § "Cache mounts".
-# requirements.txt is COPY'd from the build context (the repo root), so
-# a dep version bump lands in a separate image layer and re-keys the
-# cache automatically. Pinned exact versions satisfy the spec's
-# "pinned pip deps" requirement; transitive deps (e.g. rpds-py for
-# jsonschema, pathspec for yamllint) are resolved by pip and recorded
-# below in the AC7 / AC8 verification log.
+# requirements.txt holds the three direct pins (the human-authored source
+# of truth); requirements.lock is the generated full-resolution lock with
+# a --hash=sha256:... line per artifact (regenerate with
+# `uv pip compile --generate-hashes --python-version 3.11
+#  --python-platform x86_64-unknown-linux-gnu requirements.txt -o
+#  requirements.lock`; the resolved tree is also recorded in
+# toolchain-pins.md § "Python").
+# The install is deterministic and integrity-verified (B-06 / BAR-003 /
+# BAR-004):
+#   --require-hashes: every downloaded artifact must match a recorded
+#     SHA-256 — a changed, yanked, or mirror-served wheel fails the build.
+#   --no-deps: the lock already contains the complete transitive tree
+#     (attrs, jsonschema-specifications, pathspec, referencing, rpds-py,
+#     typing-extensions), so nothing is resolved against live PyPI
+#     metadata at build time.
+#   --no-cache-dir: build-only, keeps the pip layer small. The runtime
+#     pip cache lives in the pip-cache volume mounted at
+#     /home/builder/.cache/pip per ci-architecture.md "Common
+#     conventions" § "Cache mounts" (B-11 / BAR-013) — PIP_NO_CACHE_DIR
+#     is intentionally NOT exported as an ENV (see the ENV block above).
+# requirements.lock is COPY'd from the build context (the repo root), so
+# a dep bump lands in a separate image layer and re-keys the cache
+# automatically. Bump procedure: edit requirements.txt, regenerate the
+# lock, and update toolchain-pins.md § "Python" in the same change.
 # Build-time network endpoint: pypi.org / files.pythonhosted.org.
-COPY infra/containers/candelamoon-docs/requirements.txt /tmp/requirements.txt
+COPY infra/containers/candelamoon-docs/requirements.lock /tmp/requirements.lock
 RUN set -eux; \
-    pip install --no-cache-dir -r /tmp/requirements.txt; \
-    rm /tmp/requirements.txt
+    pip install --no-cache-dir --require-hashes --no-deps -r /tmp/requirements.lock; \
+    rm /tmp/requirements.lock
 
 # --- markdownlint-cli + markdown-link-check (npm) -------------------------
 # Per ci-architecture.md § "candelamoon-docs" § "Installed tools":
 #   "Node.js 22 LTS + markdownlint-cli; design validator entrypoint
 #    (validate-design ...)"
-# Both packages are installed globally; `npm install -g` writes to
-# /opt/node/lib/node_modules and puts the binstubs in /opt/node/bin/,
-# owned by root (the build-time user), which is correct for global
-# tools. The packages are pinned by exact version (see the ENV block
-# above) so the same Major.minor.patch resolves on every rebuild.
-# `npm cache clean --force` removes the cache that the install would
+# The two top-level packages are pinned by exact version in package.json;
+# the full transitive tree (with per-package integrity hashes) is locked
+# in package-lock.json (lockfileVersion 3, generated with
+# `npm install --package-lock-only`; regenerate with npm >= 10).
+# `npm ci --ignore-scripts` installs EXACTLY the locked tree — no live
+# semver resolution, integrity-verified via the lock's `integrity`
+# hashes, and no lifecycle scripts executed as root (BAR-005). The
+# resulting node_modules is then wired into the global layout that
+# `npm install -g` would have produced: packages under
+# /opt/node/lib/node_modules and bin symlinks in /opt/node/bin
+# (markdownlint-cli 0.45.0 declares a single `markdownlint` bin;
+# markdown-link-check 3.13.7 declares `markdown-link-check`).
+# `npm cache clean --force` removes the cache the install would
 # otherwise leave behind. The npm run-time ALSO writes a `_logs/`
 # directory under $HOME/.npm/ with timestamped debug-log files whose
-# CONTENT varies between rebuilds (different timestamps, durations, etc.)
-# — those files would defeat AC8 reproducibility even though their
+# CONTENT varies between rebuilds (different timestamps, durations,
+# etc.) — those files would defeat AC8 reproducibility even though their
 # mtimes are normalized below, so we delete them after install. The
 # build-time network endpoint is registry.npmjs.org.
+COPY infra/containers/candelamoon-docs/package.json \
+     infra/containers/candelamoon-docs/package-lock.json \
+     /tmp/candelamoon-docs-npm/
 RUN set -eux; \
-    npm install -g "markdownlint-cli@${MARKDOWNLINT_VERSION}"; \
-    npm install -g "markdown-link-check@${MARKDOWN_LINK_CHECK_VERSION}"; \
+    cd /tmp/candelamoon-docs-npm; \
+    npm ci --ignore-scripts; \
+    mkdir -p /opt/node/lib/node_modules; \
+    cp -a node_modules/. /opt/node/lib/node_modules/; \
+    ln -s ../lib/node_modules/markdownlint-cli/markdownlint.js /opt/node/bin/markdownlint; \
+    ln -s ../lib/node_modules/markdown-link-check/markdown-link-check /opt/node/bin/markdown-link-check; \
+    cd /; \
+    rm -rf /tmp/candelamoon-docs-npm; \
     npm cache clean --force; \
     rm -rf /home/builder/.npm/_logs /home/builder/.npm/_cacache
 
@@ -239,9 +278,15 @@ RUN set -eux; \
     [ "$(id -u builder)" = "1000" ] || { echo "ERROR: builder uid is $(id -u builder), expected 1000" >&2; exit 1; }; \
     [ "$(id -g builder)" = "1000" ] || { echo "ERROR: builder gid is $(id -g builder), expected 1000" >&2; exit 1; }; \
     [ "$(id -G builder)" = "1000" ] || { echo "ERROR: builder retains supplementary groups: $(id -G builder)" >&2; exit 1; }; \
-    # Fail closed if a sudoers rule names builder or %builder.
-    ! grep -rq '^builder\b\|^%builder\b' /etc/sudoers /etc/sudoers.d/ 2>/dev/null \
-        || { echo "ERROR: builder has sudoers entries" >&2; exit 1; }; \
+    # Fail closed if a sudoers rule names builder or %builder. Each path
+    # is tested explicitly (BAR-009): the previous `! grep -rq ... || ...`
+    # negated grep status 2 (missing/unreadable path) into success and
+    # skipped the error branch, so an absent /etc/sudoers.d/ silently
+    # proved nothing. Globs that match nothing stay literal and are
+    # skipped by the `[ -f ] || continue` guard; only existing regular
+    # files are grepped. (Single-line form: the RUN body is one
+    # backslash-continued shell line, so the loop cannot span lines.)
+    for f in /etc/sudoers /etc/sudoers.d/*; do [ -f "$f" ] || continue; if grep -q '^builder\b\|^%builder\b' "$f"; then echo "ERROR: builder has sudoers entries in $f" >&2; exit 1; fi; done; \
     # Home must exist and be owned by builder (uid 1000); pip / npm
     # runtimes resolve ~ to /home/builder and write to .cache/pip and .npm
     # under it (B-09, BER-011).
@@ -263,30 +308,34 @@ RUN set -eux; \
 RUN mkdir -p /home/builder/.cache/pip /home/builder/.npm \
     && chown -R builder:builder /home/builder
 
-# --- Normalize file mtimes to SOURCE_DATE_EPOCH for reproducibility --------
-# pip, npm, and the Node.js tarball extraction set mtimes to "now" when
-# writing files. For reproducible image content across rebuilds (AC8),
-# retouch every file and directory we wrote, regardless of its original
-# timestamp. We skip /usr (the base image's Python install) since it's
-# already deterministic for a given base digest. No `-newer /etc/hostname`
-# filter — that marker is engine-managed and unstable, so it cannot
-# anchor a reproducibility check (BER-012). No error suppression: if
-# touch fails, the build fails, which signals a real problem rather
-# than silently shipping non-reproducible layers (BER-013, B-20).
-# Note: image DIGEST is not bit-reproducible because Podman's layer-tar
-# gzip is non-deterministic (known debt from P1-001 AC8). Two --no-cache
-# builds produce identical file counts and total bytes under /opt, /usr,
-# and /home/builder; only the gzip wrapper bytes differ.
-RUN find /opt/node /usr/local /home/builder \
-        -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +
-
 # --- Create /workspace before dropping privileges -------------------------
 # Per ci-architecture.md "Common conventions" § "Source mount": the repo
 # is bind-mounted at /workspace at run time. Create and own the
 # directory while still root: the unprivileged builder user cannot
 # create it under / (BER-011). `WORKDIR` below then never fails, with
 # or without the bind mount (e.g. ad-hoc `podman run` invocations).
+# Created BEFORE the mtime-normalization pass below so /workspace's own
+# directory mtime is normalized to SOURCE_DATE_EPOCH too (B-12 / BAR-010).
 RUN mkdir -p /workspace && chown builder:builder /workspace
+
+# --- Normalize file mtimes to SOURCE_DATE_EPOCH for reproducibility --------
+# pip, npm, and the Node.js tarball extraction set mtimes to "now" when
+# writing files. For reproducible image content across rebuilds (AC8),
+# retouch every file and directory we wrote, regardless of its original
+# timestamp. We skip /usr (the base image's Python install) since it's
+# already deterministic for a given base digest. /workspace is included:
+# it is created (and chowned) just above, before this pass (B-12 /
+# BAR-010). No `-newer /etc/hostname` filter — that marker is
+# engine-managed and unstable, so it cannot anchor a reproducibility
+# check (BER-012). No error suppression: if touch fails, the build
+# fails, which signals a real problem rather than silently shipping
+# non-reproducible layers (BER-013, B-20).
+# Note: image DIGEST is not bit-reproducible because Podman's layer-tar
+# gzip is non-deterministic (known debt from P1-001 AC8). Two --no-cache
+# builds produce identical file counts and total bytes under /opt, /usr,
+# /home/builder, and /workspace; only the gzip wrapper bytes differ.
+RUN find /opt/node /usr/local /home/builder /workspace \
+        -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +
 
 # --- Final runtime configuration ------------------------------------------
 # USER builder is the last USER directive per ci-architecture.md "Common
@@ -300,9 +349,10 @@ USER builder
 # builder` above.
 WORKDIR /workspace
 
-# Default command: keep the container alive for `podman run --rm ... bash`
-# style inspection. CI workflows pass an explicit command (e.g.
-# `podman run --rm --network=none candelamoon-docs:ci
-# /usr/local/bin/validate-design` or `markdownlint ...`), so this is
-# only the fall-through.
-CMD ["bash"]
+# Default command: run the design validator (MVP tool-presence check).
+# `podman run --rm --network=none <image>` now validates by default
+# instead of dropping into bash and exiting 0 without validating
+# anything (B-17). CI workflows can still pass an explicit command;
+# for interactive inspection override with `--entrypoint bash`, e.g.
+# `podman run --rm -it --entrypoint bash candelamoon-docs:review`.
+CMD ["validate-design"]

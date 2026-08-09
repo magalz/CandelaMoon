@@ -9,9 +9,17 @@
 # asserts at run time.
 #
 # Pinning policy: every direct dependency is pinned to an exact
-# Major.minor.patch. Transitive dependencies are resolved by pip from
-# PyPI's metadata at build time; the resolved tree is recorded by the
-# AC7 / AC8 verification log (`pip freeze` in a freshly built image).
+# Major.minor.patch. Transitive dependencies are resolved ONCE and
+# locked — with a --hash=sha256:... line per artifact — in the generated
+# `requirements.lock` (this file is the human-authored source of truth;
+# regenerate the lock with:
+#   uv pip compile --generate-hashes --python-version 3.11 \
+#     --python-platform x86_64-unknown-linux-gnu requirements.txt -o requirements.lock
+# or pip-compile --generate-hashes with the same constraints).
+# The Containerfile installs with
+# `pip install --require-hashes --no-deps -r requirements.lock`, so a
+# rebuild cannot silently pick up a changed transitive version; the
+# resolved tree is also recorded in toolchain-pins.md § "Python 3.11".
 #
 # Choice of link checker: we use the npm package `markdown-link-check`
 # (see Containerfile § "markdownlint-cli + markdown-link-check"), so

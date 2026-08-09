@@ -1,0 +1,10 @@
+{
+  "name": "candelamoon-docs-toolchain",
+  "version": "1.0.0",
+  "private": true,
+  "description": "npm dependency manifest for the candelamoon-docs image (markdownlint-cli, markdown-link-check). The resolved transitive tree is locked in package-lock.json; the Containerfile installs it with `npm ci --ignore-scripts` and wires the global layout under /opt/node.",
+  "dependencies": {
+    "markdownlint-cli": "0.45.0",
+    "markdown-link-check": "3.13.7"
+  }
+}

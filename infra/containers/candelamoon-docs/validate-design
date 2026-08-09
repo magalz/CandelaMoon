@@ -7,19 +7,22 @@
 #    manifest); ADR/capability-matrix validation scripts."
 #
 # MVP scope (P1-002): assert that every required tool is installed and
-# runnable, and exit non-zero if any tool is missing or broken. Real
-# validation against /workspace/docs content (architecture schemas, ADR
-# register, capability matrix, evidence manifest) is a P1-017 follow-up
-# task; this script is the placeholder that the follow-up will extend.
+# runnable, and exit non-zero if any tool is missing, broken, or not the
+# exact pinned version. Real validation against /workspace/docs content
+# (architecture schemas, ADR register, capability matrix, evidence
+# manifest) is a P1-017 follow-up task; this script is the placeholder
+# that the follow-up will extend.
 #
 # Fail-closed contract: any missing or broken tool exits 1 and the script
-# prints an ERROR line per failing tool. The on-host caller (the
+# prints an ERROR line per failing tool. Unknown or extra arguments exit 2
+# with usage on stderr (B-16 / BAR-008). The on-host caller (the
 # docs-validate CI job) treats a non-zero exit as a hard build failure.
 #
 # Network policy: this script is designed to run with --network=none at
 # run time (per ci-architecture.md § "candelamoon-docs" § "Run-time
 # network: none - all validation is file-based and offline"). It must
-# not make any network calls.
+# not make any network calls. Every check is additionally bounded by
+# `timeout 30` so a hung tool cannot hang the job (BAR-015).
 #
 # Usage:
 #   validate-design              # concise (OK / ERROR lines only)
@@ -28,8 +31,19 @@
 set -eu
 
 verbose=0
-if [ "${1:-}" = "--verbose" ]; then
-    verbose=1
+if [ "$#" -gt 1 ]; then
+    printf 'ERROR: too many arguments: %s\n' "$*" >&2
+    printf 'Usage: validate-design [--verbose]\n' >&2
+    exit 2
+fi
+if [ "$#" -eq 1 ]; then
+    if [ "$1" = "--verbose" ]; then
+        verbose=1
+    else
+        printf 'ERROR: unknown argument: %s\n' "$1" >&2
+        printf 'Usage: validate-design [--verbose]\n' >&2
+        exit 2
+    fi
 fi
 
 fail=0
@@ -49,71 +63,77 @@ report() {
     fi
 }
 
-# check <label> <expected-regex> <command...>
-# Run the command; on success, run pattern against the output. On any
-# failure (non-zero exit, empty output, or pattern miss), record an
-# ERROR and bump `fail`. The condition guard suppresses `set -e` so the
-# whole script does not abort on the first miss.
+# check <label> <expected-pattern> <command...>
+# Run the command under `timeout 30`; on success, run the anchored
+# pattern against the output. On timeout (exit 124) report a distinct
+# TIMEOUT error (BAR-015). On any other failure (non-zero exit, empty
+# output, or pattern miss) record an ERROR and bump `fail`. The
+# `&& rc=0 || rc=$?` guard suppresses `set -e` so the script does not
+# abort on the first miss.
 check() {
     local label=$1 pattern=$2
     shift 2
-    local out
-    if out=$("$@" 2>&1) && [ -n "$out" ] && printf '%s' "$out" | grep -qE "$pattern"; then
+    local out rc first
+    out=$(timeout 30 "$@" 2>&1) && rc=0 || rc=$?
+    if [ "$rc" -eq 124 ]; then
+        report "$label" "ERROR" "timed out after 30s"
+        fail=1
+        return
+    fi
+    first=$(printf '%s' "$out" | head -n 1)
+    if [ "$rc" -eq 0 ] && [ -n "$out" ] && printf '%s' "$out" | grep -qE "$pattern"; then
         if [ "$verbose" -eq 1 ]; then
             # Truncate the version / path line to a single line for log
             # legibility; multi-line output is collapsed to the first line.
-            local first
-            first=$(printf '%s' "$out" | head -n 1)
             report "$label" "OK" "$first"
         else
             report "$label" "OK"
         fi
+    elif [ -z "$out" ]; then
+        report "$label" "ERROR" "command produced no output (exit $rc)"
+        fail=1
     else
-        local first
-        first=$(printf '%s' "$out" | head -n 1)
-        if [ -z "$out" ]; then
-            report "$label" "ERROR" "command produced no output"
-        else
-            report "$label" "ERROR" "output did not match /$pattern/: $first"
-        fi
+        report "$label" "ERROR" "exit $rc; output did not match /$pattern/: $first"
         fail=1
     fi
 }
 
 # --- Python 3.11 (from the base image, fixed by the digest pin) -----------
-# python3 prints "Python 3.11.15"; the leading "Python" is unique enough
-# to confirm the base image is the pinned 3.11-slim digest.
-check "python3"              'Python 3\.11'                  python3 --version
+# python3 prints "Python 3.11.15"; the anchored pattern pins major.minor
+# (any 3.11.x patch is acceptable per toolchain-pins.md § "Python 3.11" —
+# the patch level is fixed by the base-image digest, not by this check).
+check "python3"              '^Python 3\.11\.'               python3 --version
 
 # --- Node.js 22.x (from the official tarball, SHA-256 pinned) -------------
-# node prints "v22.23.2"; the leading "v22." pins the LTS major per
-# toolchain-pins.md § "Node.js 22 LTS".
-check "node"                 'v22\.'                         node --version
+# node prints "v22.23.2"; the anchored pattern pins the LTS major (any
+# 22.x.y patch is acceptable per toolchain-pins.md § "Node.js 22 LTS" —
+# the patch is fixed by the SHA-256-pinned tarball).
+check "node"                 '^v22\.'                        node --version
 
-# --- npm (sibling to node; --version exits 0 on modern npm) ---------------
-# npm prints just a version number ("10.9.8").
-check "npm"                  '[0-9]+\.[0-9]+\.[0-9]+'        npm --version
+# --- npm (sibling to node; bundled with the pinned Node tarball) ----------
+# npm prints just a version number; the exact pin is the version shipped
+# inside the pinned Node 22.23.2 tarball (toolchain-pins.md § "Node").
+check "npm"                  '^10\.9\.8$'                    npm --version
 
 # --- Python pip tools (per ci-architecture.md § "candelamoon-docs") -------
-# jsonschema, pyyaml, yamllint. Each is checked by importing the module
-# and printing its version via importlib.metadata (the deprecation-free
-# way to query a distribution's version in 3.11+). If the import fails
-# or the version is empty, the check fails. Patterns are unanchored so
-# a leading "deprecation warning" line on stderr does not break the
-# match (stderr is captured into the same `$out` because we run with
-# `2>&1`).
-check "jsonschema"           '[0-9]+\.[0-9]+'                python3 -c "import importlib.metadata as m; print(m.version('jsonschema'))"
-check "pyyaml"               '[0-9]+\.[0-9]+'                python3 -c "import importlib.metadata as m; print(m.version('PyYAML'))"
+# Each check imports the REAL module and prints its __version__, then the
+# anchored pattern asserts the exact pinned version (B-15 / BAR-006: a
+# stale or corrupted .dist-info cannot pass — the import itself must
+# succeed; B-14 / BAR-007: a different version cannot match). jsonschema
+# and pyyaml are checked separately so a failure names the failing
+# package precisely (the triaged patch suggested one combined command;
+# splitting keeps one command per check so failures stay attributable).
+check "jsonschema"           '^4\.23\.0$'                    python3 -c "import jsonschema; print(jsonschema.__version__)"
+check "pyyaml"               '^6\.0\.2$'                     python3 -c "import yaml; print(yaml.__version__)"
 # yamllint prints "yamllint 1.37.1" (with a leading product name); the
-# pattern matches anywhere in the line.
-check "yamllint"             '[0-9]+\.[0-9]+'                yamllint --version
+# anchored pattern includes the exact product prefix and version.
+check "yamllint"             '^yamllint 1\.37\.1$'          yamllint --version
 
 # --- npm global tools (per ci-architecture.md § "candelamoon-docs") -------
 # markdownlint-cli prints just a version ("0.45.0"); markdown-link-check
-# prints just a version ("3.13.7"). The unanchored [0-9]+.[0-9]+ pattern
-# is tolerant of future CLIs adding a product-name prefix.
-check "markdownlint"         '[0-9]+\.[0-9]+'                markdownlint --version
-check "markdown-link-check"  '[0-9]+\.[0-9]+'                markdown-link-check --version
+# prints just a version ("3.13.7"). Anchored exact pins (B-14 / BAR-007).
+check "markdownlint"         '^0\.45\.0$'                    markdownlint --version
+check "markdown-link-check"  '^3\.13\.7$'                    markdown-link-check --version
 
 # --- Final summary --------------------------------------------------------
 if [ "$fail" -ne 0 ]; then
