@@ -68,14 +68,23 @@ Every leaf task flows through this cycle:
     Each gets need-to-know context only. Writes findings.
 
  5. Bernstein triages Phase 1 findings: normalize, dedupe, assess severity,
-    route (patch / defer / dismiss / decision-needed).
+     route (patch / defer / dismiss / decision-needed).
+
+ 5a. Bernstein creates GitHub issues for every deferred finding with severity
+     HIGH or MEDIUM (per orchestrator guide §8.2.1). Issue URLs are recorded
+     in the session handout's Known Debt table and a dedicated "GitHub Issues
+     Created" section.
 
  6. IF patches needed: dispatch Bach again with triaged findings.
 
  7. Dispatch Review Phase 2 SEQUENTIALLY:
-    Stravinsky (Red Team) first, then Brahms (Blue Team).
+     Stravinsky (Red Team) first, then Brahms (Blue Team).
 
  8. Bernstein triages Phase 2 findings.
+
+ 8a. Bernstein creates GitHub issues for every deferred finding with severity
+     HIGH or MEDIUM (per orchestrator guide §8.2.1). Issue URLs are recorded
+     in the session handout.
 
  9. IF patches needed: dispatch Bach again.
 

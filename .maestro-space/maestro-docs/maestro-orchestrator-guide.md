@@ -168,6 +168,10 @@ Bernstein normalizes, deduplicates, assesses severity (low/medium/high), and rou
 **decision-needed** → ask user; **patch** → send to Bach; **defer** → known debt;
 **dismiss** → noise / out-of-scope.
 
+**After every triage**: create GitHub issues for all HIGH and MEDIUM deferred findings
+(per §8.2.1). Record issue URLs in the session handout. This is steps 5a and 8a of
+the task cycle.
+
 ### Phase 2: Sequential
 
 1. Dispatch Stravinsky (Red Team). Wait for completion.

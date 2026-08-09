@@ -89,6 +89,17 @@ the next session's expected first action.]
 |---|---|---|---|
 | <id> | <description> | <low/med/high> | <how/when to resolve> |
 
+## GitHub Issues Created
+
+Per orchestrator guide §8.2.1 — every HIGH/MEDIUM deferred finding creates a tracked GitHub issue.
+
+| Issue | Severity | Finding(s) | Target |
+|---|---|---|---|
+| [#N](url) <prefix> | <severity> | <finding IDs> | <owning task> |
+
+Pre-existing issues carrying findings from this task (if any):
+| [#N](url) <prefix> | <severity> | <finding IDs> | <owning task> |
+
 ## UAT Decision
 
 - **Status**: `<passed/failed/pending>`
