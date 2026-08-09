@@ -408,12 +408,19 @@ RUN set -eux; \
         exit 1; \
     fi
 
-# --- Permissions: chown everything to builder -----------------------------
+# --- Permissions: root-owned tool trees, builder-owned runtime caches ------
 # Per ci-architecture.md "Common conventions": "All cache/output mounts are
 # `chown builder:builder` at creation." Same rule for the on-disk copies
 # baked into the image: every cache directory the container will write to at
 # run time must be owned by builder.
-RUN chown -R builder:builder /opt/android-sdk /opt/gradle /home/builder
+# Per STR-06: baked tool trees are root-owned and read-only for builder.
+# This prevents a compromised PR build from overwriting SDK, NDK, or Gradle
+# binaries that could then execute in a trusted CI job via cache reuse.
+# /home/builder stays builder-owned for Gradle/Maven runtime caches.
+RUN chown -R root:root /opt/android-sdk /opt/gradle \
+    && find /opt/android-sdk /opt/gradle -type d -exec chmod go-w {} + \
+    && find /opt/android-sdk /opt/gradle -type f -exec chmod go-w {} + \
+    && chown -R builder:builder /home/builder
 
 # --- Normalize file mtimes to SOURCE_DATE_EPOCH for reproducibility --------
 # sdkmanager and Gradle set mtimes to "now" when extracting archives. For
