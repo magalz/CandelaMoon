@@ -313,15 +313,17 @@ backlog that survives across sessions and is visible to the human owner.
 |---|---|---|
 | `high` | Any (deferred, tech-debt, secops) | **MUST** create a GitHub issue |
 | `medium` | Any | **MUST** create a GitHub issue |
+| `critical` | Any | **MUST** create a GitHub issue — blocks the next phase |
 | `low` | Any | Bernstein's discretion; may skip |
 
 **Issue templates and labels:**
 
 | Finding origin | Template file | Title prefix | GitHub labels |
 |---|---|---|---|
-| Review Phase 1/2 — deferred (non-security, non-architectural) | `maestro-templates/issue-deferred.md` | `[Deferred.P{N}.NN]` | `Deferred` + severity label (`High` / `Medium` / `Low`) |
-| Review Phase 1/2 — architectural or cross-cutting concern | `maestro-templates/issue-tech-debt.md` | `[Tech Debt.P{N}.NN]` | `Tech Debt` + severity label |
-| Review Phase 2 — security finding (STR-xxx) | `maestro-templates/issue-secops.md` | `[SecOps.P{N}.NN]` | `SecOps` + severity label |
+| Review Phase 1/2 — deferred (non-security, non-architectural) | `maestro-templates/issue-deferred.md` | `[Deferred.P{N}.NN]` | `Deferred` + severity label (`Critical` / `High` / `Medium` / `Low`) |
+| Review Phase 1/2 — architectural or cross-cutting concern | `maestro-templates/issue-tech-debt.md` | `[Tech Debt.P{N}.NN]` | `Tech Debt` + severity label (`Critical` / `High` / `Medium` / `Low`) |
+| Review Phase 2 — security finding (STR-xxx) | `maestro-templates/issue-secops.md` | `[SecOps.P{N}.NN]` | `SecOps` + severity label (`Critical` / `High` / `Medium` / `Low`) |
+| Any source — blocks next phase | `maestro-templates/issue-deferred.md` (add Critical label) | `[Critical.P{N}.NN]` | `Critical` + severity label
 
 **Numbering**: `NN` is a sequential counter within the phase, shared across all issue
 types. Gaps are tolerated. Bernstein tracks the next available `NN` in the phase plan.
