@@ -91,6 +91,27 @@ secrets/
 **/secrets/
 *.backup
 *.bak
+# Gradle/Maven credential files
+gradle.properties
+**/gradle.properties
+.netrc
+**/.netrc
+.m2/settings.xml
+**/.m2/settings.xml
+.ssh/
+**/.ssh/
+.ssh/id_*
+**/.ssh/id_*
+.aws/
+**/.aws/
+**/credentials
+**/credentials.*
+terraform.tfvars
+terraform.tfvars.json
+**/terraform.tfvars
+**/terraform.tfvars.json
+*.pfx
+**/*.pfx
 
 # --- Memtrace (local index, not needed at container build) ---------------
 .memtrace/

@@ -208,6 +208,25 @@ RUN set -eux; \
         # cache mounts will mis-map — fail the build.
         [ "$(id -u builder)" = "1000" ] || { echo "ERROR: builder uid is $(id -u builder), expected 1000" >&2; exit 1; }; \
         [ "$(id -g builder)" = "1000" ] || { echo "ERROR: builder gid is $(id -g builder), expected 1000" >&2; exit 1; }; \
+        # STR-08: uid/gid identity alone does not prove the account is
+        # unprivileged — a base-supplied builder can keep privileged
+        # supplementary groups (sudo, docker, disk, device, ...) or a
+        # sudoers rule. Normalize the account and fail closed.
+        # 1) Force the primary group to GID 1000 (self-heals a base that
+        #    drifted the group; tolerant when it already holds gid 1000).
+        usermod --gid 1000 builder 2>/dev/null || true; \
+        # 2) Replace the supplementary-group list with exactly "builder" so
+        #    no adm/sudo/video/... membership survives (B-10, STR-08).
+        usermod --groups builder builder; \
+        # 3) Lock the password: builder is a service account — no
+        #    password-based or interactive login (STR-08).
+        usermod --lock builder; \
+        # 4) Assert the normalization held: id -G must contain ONLY gid 1000.
+        [ "$(id -G builder)" = "1000" ] \
+            || { echo "ERROR: builder retains supplementary groups: $(id -G builder)" >&2; exit 1; }; \
+        # 5) Fail closed if a sudoers rule names builder or %builder.
+        ! grep -rq '^builder\b\|^%builder\b' /etc/sudoers /etc/sudoers.d/ 2>/dev/null \
+            || { echo "ERROR: builder has sudoers entries" >&2; exit 1; }; \
     elif getent passwd ubuntu >/dev/null; then \
         # Rename the base's ubuntu account. Tolerate a primary group that
         # is not literally named "ubuntu" (rename whatever it is); if a
@@ -223,6 +242,10 @@ RUN set -eux; \
         # (B-10). usermod -G sets the supplementary list to exactly
         # "builder".
         usermod -G builder builder; \
+        # STR-08 consistency with the existing-builder branch: lock the
+        # password (the supplementary-group strip above via `usermod -G
+        # builder` is the same operation as `usermod --groups builder`).
+        usermod --lock builder; \
         # The base's subordinate-ID ranges still name `ubuntu` after the
         # rename; rewrite them so nested rootless tooling finds builder's
         # ranges (B-10).
