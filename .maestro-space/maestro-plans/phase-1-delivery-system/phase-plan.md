@@ -8,7 +8,7 @@ workflows, self-hosted runners, and canary PR.
 design validator (P1-017) runs in CI.
 **Related ADRs**: 0013, 0014, 0015, 0019
 **Dependencies on previous phase**: Phase 0 complete.
-**Estimated task count**: 21 tasks (3 completed, 3 in development, 15 pending)
+**Estimated task count**: 22 tasks (3 completed, 3 in development, 16 pending)
 
 ---
 
@@ -74,6 +74,12 @@ design validator (P1-017) runs in CI.
 | # | ID | Title | Status | Depends On | Complexity | Evidence |
 |---|---|---|---|---|---|---|
 | 21 | P1-021 | Fix baseline unit test failures | **Completed** | — | M | PR #6 merged. 68/68 green. Coverage PASS (50/50). |
+
+### Group I: Security Remediation
+
+| # | ID | Title | Status | Depends On | Complexity | Evidence |
+|---|---|---|---|---|---|---|
+| 22 | P1-022 | Dependency vulnerability remediation (48 Dependabot alerts) | Pending | — | L | 1 critical (Bouncy Castle), 21 high (16x Netty), 24 medium, 2 low |
 
 ### Interphase Framework Work
 
