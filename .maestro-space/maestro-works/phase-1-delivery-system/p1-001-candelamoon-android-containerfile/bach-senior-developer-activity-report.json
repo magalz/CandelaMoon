@@ -1,0 +1,128 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "activity-report",
+  "agent": {
+    "name": "Bach (Senior Developer)",
+    "role": "Senior Developer — implements handoff tasks with TDD discipline, applies review patches, verifies with build + runtime evidence",
+    "subagent_type": "bach-senior-developer",
+    "dispatched_by": "Bernstein (orchestrator)",
+    "task_id": "P1-001"
+  },
+  "task": {
+    "change_id": "P1-001",
+    "phase": "Phase 1",
+    "phase_short": "phase-1-delivery-system",
+    "branch": "moonlight-noir",
+    "base_sha": "2118b61cd1dc49d600b36f06f7d832d5a7b8b824",
+    "head_sha": "9c32ba5f510cc3fae63e8c3792352cfaf0b5d3fd",
+    "pr_url": ""
+  },
+  "data": {
+    "actions": [
+      "Read handoff, Berlioz/Bartok/Verdi findings reports, Containerfile, .containerignore, toolchain-pins.md.",
+      "Fact-checked triaged instructions against primary sources: repository2-3.xml (platform-tools;37.0.1 is not a valid package ID; versioned archive platform-tools_r37.0.1-linux.zip with SHA-1 477254aa5f903c15cf51001717bdf347fb6b53e0), cmdline-tools 16.0 jars (no --timeout option), base image behavior (yes exits 141 SIGPIPE under pipefail; Buildah does not expand ENV vars within the same ENV instruction).",
+      "PATCH 1: Added ENV HOME=/home/builder to the standard-locations ENV block (BER-006, B-14).",
+      "PATCH 2: Reworked the builder user RUN - uid/gid 1000 postcondition asserts on every branch, existing-builder validation, usermod -G supplementary-group strip, subuid/subgid rewrite, stat/find home ownership + writability validation (BER-009, BER-010, B-08, B-09, B-10).",
+      "PATCH 3: Added RUN mkdir -p /workspace && chown builder:builder /workspace before USER builder (BER-011).",
+      "PATCH 4: Added ANDROID_NDK_HOME (own ENV instruction after ANDROID_HOME due to Buildah expansion semantics) and NDK LLVM toolchain + cmake/3.22.1/bin on PATH (B-18).",
+      "PATCH 5: platform-tools pinned via direct download of platform-tools_r37.0.1-linux.zip + sha1sum check against the repository XML; TODO(P1-001-followup) SHA-256 markers at cmdline-tools, platform-tools, Gradle, and Robolectric download sites; apt base-digest note (BER-001, BER-002 note, BER-003, BER-020, B-03).",
+      "PATCH 6: Replaced the mtime normalization with a direct find -exec touch -h -d @SOURCE_DATE_EPOCH over /opt/android-sdk /opt/gradle /home/builder, no error suppression (BER-012, BER-013, B-20).",
+      "PATCH 7: Added secrets/credentials patterns (.env, *.jks, *.keystore, *.p12, *.pem, *-key.pem, *_key.pem, *.key, credentials.json, *.credentials, secrets/, **/secrets/, *.backup, *.bak) to .containerignore (BER-015, B-23).",
+      "PATCH 8: Robolectric loop hardening - continue-on-error download, unzip -tq validation per JAR, fail-at-end if any missing/corrupt; API 21-27 gap documented as intentional per ADR 0007 (B-11, B-12).",
+      "PATCH 9: apt DEBIAN_FRONTEND=noninteractive + Acquire::Retries=3; rm -rf cmdline-tools/latest before extraction; license acceptance postconditions (confirmation grep + license file); timeout 600 wrapper around sdkmanager (B-02, B-06, B-07).",
+      "Micro-verified the reworked user RUN in isolation (p1-001-user-test image): uid/gid 1000, groups=builder only, subuid/subgid=builder:100000:65536, home owner-writable, ubuntu removed.",
+      "Ran two full podman builds (first caught the Buildah ENV expansion bug: ANDROID_NDK_HOME=/ndk/27.0.12077973; fixed by splitting the ENV instruction; second build green 18/18). Logs at %TEMP%/opencode/p1-001-verify/build-review.log and build-review2.log.",
+      "Ran the full AC7-style validation suite under --network=none: java -version, id, env, licenses, platform-tools revision, sdkmanager --list, PATH resolution (clang/cmake/ninja), mtime normalization, wrapper cache, $HOME/.m2 resolution.",
+      "Verified offline gradlew: ./gradlew --version in a throwaway project under --network=none -> Gradle 8.13 / Kotlin 2.0.21 / launcher JVM 17.0.19 (repo gradlew CRLF-stripped in-container for the test).",
+      "Committed code changes (9c32ba5f), updated handoff (head_sha, review_phase_1.fixes_applied=true, triaged_findings=9 patches + 3 defer/dismiss categories, Agent Output), wrote this report."
+    ],
+    "files": {
+      "created": [
+        ".maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/bach-senior-developer-activity-report.md",
+        ".maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/bach-senior-developer-activity-report.json"
+      ],
+      "modified": [
+        "infra/containers/candelamoon-android/Containerfile",
+        ".containerignore",
+        "docs/infrastructure/toolchain-pins.md",
+        ".maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/handoff.md"
+      ]
+    },
+    "verification": {
+      "build": {
+        "command": "podman build --pull=never -t candelamoon-android:review -f infra/containers/candelamoon-android/Containerfile .",
+        "result": "success (18/18 steps)",
+        "image_id": "038cc9cf4dd829ab0de9bb258ee2d0945ec32058e9cc46395f79f1499f45be8e",
+        "robolectric_loop_evidence": "unzip -tq ran on all nine JARs; final check '[ 0 -gt 0 ]' passed (zero missing/corrupt)"
+      },
+      "micro_build": {
+        "command": "podman build -t p1-001-user-test (user RUN block verbatim, FROM pinned base)",
+        "result": "success; id builder -> uid=1000 gid=1000 groups=1000(builder); /etc/subuid+subgid -> builder:100000:65536; /home/builder drwxr-x--- builder builder; ubuntu removed"
+      },
+      "runtime_checks": {
+        "id_observed": "uid=1000(builder) gid=1000(builder) groups=1000(builder)",
+        "env_observed": {
+          "HOME": "/home/builder",
+          "GRADLE_USER_HOME": "/home/builder/.gradle",
+          "ANDROID_HOME": "/opt/android-sdk",
+          "ANDROID_NDK_HOME": "/opt/android-sdk/ndk/27.0.12077973"
+        },
+        "java_observed": "openjdk 17.0.19 (2026-04-21) / Temurin-17.0.19+10",
+        "platform_tools_revision": "Pkg.Revision=37.0.1",
+        "sdkmanager_list_observed": [
+          "build-tools;36.0.0",
+          "cmake;3.22.1",
+          "ndk;27.0.12077973",
+          "platform-tools 37.0.1",
+          "platforms;android-36"
+        ],
+        "path_resolution_observed": {
+          "clang": "/opt/android-sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang (NDK 18.0.1)",
+          "cmake": "/opt/android-sdk/cmake/3.22.1/bin/cmake (3.22.1-g37088a8)",
+          "ninja": "/opt/android-sdk/cmake/3.22.1/bin/ninja (1.10.2)"
+        },
+        "licenses_observed": "android-googletv-license, android-googlexr-license, android-sdk-arm-dbt-license, android-sdk-license, android-sdk-preview-license, google-gdk-license, mips-android-sysimage-license",
+        "mtime_normalization_observed": "2025-01-01 00:00:00.000000000 +0000 on /opt/android-sdk/platform-tools/adb, /opt/gradle/gradle-8.13/bin/gradle, /home/builder/.m2/repository/org/robolectric/android-all-instrumented",
+        "workspace_observed": "/workspace drwxr-xr-x builder builder",
+        "gradle_wrapper_cache": {
+          "path": "/home/builder/.gradle/wrapper/dists/gradle-8.13-bin/5xuhj0ry160q40clulazy9h7d/",
+          "contents": ["gradle-8.13/", "gradle-8.13-bin.zip", "gradle-8.13-bin.zip.ok"]
+        },
+        "offline_gradlew": {
+          "command": "./gradlew --version (throwaway project, --network=none, CRLF-stripped gradlew)",
+          "result": "Gradle 8.13 / Kotlin 2.0.21 / Launcher JVM 17.0.19 (Eclipse Adoptium)"
+        },
+        "home_m2_resolution": "$HOME/.m2/repository -> /home/builder/.m2/repository"
+      },
+      "fact_checks": {
+        "platform-tools;37.0.1_package_id": "does NOT exist in repository2-3.xml (only unversioned 'platform-tools' path); implemented direct versioned-archive pin instead",
+        "sdkmanager_--timeout": "does not exist (jar string scan); implemented coreutils 'timeout 600' wrapper",
+        "pipefail_yes": "yes exits 141 (SIGPIPE) in the base image (PIPESTATUS 141 0); implemented file-redirect stdin + postconditions instead",
+        "license_confirmation_string": "confirmed present in LicensesAction.class of cmdline-tools 16.0 build 13114758",
+        "buildah_same_instruction_env_expansion": "not supported; split the ENV block (caught via in-image validation of the first build)"
+      },
+      "logs": [
+        "%TEMP%/opencode/p1-001-verify/build-review.log",
+        "%TEMP%/opencode/p1-001-verify/build-review2.log",
+        "%TEMP%/opencode/p1-001-verify/user-block-test/ (micro-build)"
+      ]
+    },
+    "deviations": [
+      "platform-tools pin mechanism differs from the dispatch instruction: 'platform-tools;37.0.1' is not a valid sdkmanager package ID (verified against repository2-3.xml). Implemented direct download of platform-tools_r37.0.1-linux.zip with SHA-1 verification against the repository XML - a strictly stronger pin.",
+      "sdkmanager timeout: --timeout=600 is not an sdkmanager option (verified in the shipped jars). Used the coreutils 'timeout 600' wrapper.",
+      "License RUN: 'set -o pipefail' on 'yes | sdkmanager --licenses' fails in this base because yes dies with SIGPIPE (141). Implemented the intent via a pre-written acceptance file redirected to sdkmanager stdin plus two postconditions (confirmation grep on the logged output; android-sdk-license file present).",
+      "ENV block split into two instructions because Buildah does not expand ${VAR} from earlier entries of the same ENV instruction (Docker does). Documented with an inline NOTE.",
+      "Repo gradlew is CRLF on disk (Windows checkout); verification CR-stripped it in-container. Not a Containerfile defect; Linux CI checkouts produce LF."
+    ],
+    "known_issues": [
+      "SHA-256 verification of cmdline-tools/Gradle/Robolectric downloads deferred: TODO(P1-001-followup) markers added at each download site; platform-tools SHA-1 is verified at build time.",
+      "Full APT snapshotting deferred (BER-002): apt inputs versioned by the base-image digest, documented inline.",
+      "Robolectric API 21-27 prefetch gap is intentional (ADR 0007 minSdk 28) and documented in the Containerfile.",
+      "AC8 image DIGEST still not bit-reproducible (Podman layer-tar gzip); mtime normalization now fails loudly instead of silently no-op'ing.",
+      "Findings outside the 12 triaged entries (B-01, B-04, B-05, B-13, B-15, B-16, B-17, B-19, B-21, B-22, B-24, B-25, B-26, BER-004, BER-005, BER-007, BER-008, BER-014, BER-016, BER-017, BER-018, BER-019, V-AC6) remain open for Review Phase 2 triage.",
+      "The first full build (before the ENV split fix) produced a wrong ANDROID_NDK_HOME; the review image (038cc9cf4dd8) is the rebuilt, validated one."
+    ]
+  },
+  "emitted_at": "2026-08-08T23:59:00Z",
+  "narrative_path": ".maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/bach-senior-developer-activity-report.md"
+}
