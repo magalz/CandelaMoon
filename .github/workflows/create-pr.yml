@@ -1,0 +1,65 @@
+name: Create PR
+
+on:
+  push:
+    branches:
+      - 'feat/**'
+      - 'fix/**'
+      - 'docs/**'
+      - 'chore/**'
+      - 'refactor/**'
+      - 'test/**'
+      - 'phase*/**'
+      - 'interphase/**'
+      - 'maintenance/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate bot token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Get default branch
+        id: default-branch
+        run: echo "name=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Create or update PR
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          BASE="${{ steps.default-branch.outputs.name }}"
+          TITLE="${BRANCH#*/}"
+          TITLE=$(echo "$TITLE" | tr '-' ' ' | tr '_' ' ')
+
+          PR_EXISTS=$(gh pr list --head "$BRANCH" --state open --json number -q '. | length')
+
+          if [ "$PR_EXISTS" = "0" ]; then
+            gh pr create \
+              --head "$BRANCH" \
+              --base "$BASE" \
+              --title "$TITLE" \
+              --body "Auto-created by candelamoon-bot for branch \`$BRANCH\`.
+
+          Reviewers and acceptance criteria are defined in the handoff file.
+
+          **Approval required from @magalz before merge.**" \
+              --draft
+            echo "Created draft PR for $BRANCH"
+          else
+            echo "PR already exists for $BRANCH — skipping"
+          fi

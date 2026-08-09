@@ -88,7 +88,10 @@ Every leaf task flows through this cycle:
 
 12. Dispatch Schubert (Tech Writer) to document and prepare session handout.
 
-13. Bernstein opens the PR. Run Memtrace review against the synchronized graph.
+13. Bernstein opens the PR via the bot workflow (`.github/workflows/create-pr.yml`).
+    The PR author MUST be `app/candelamoon-bot`, not the human CODEOWNER.
+    This ensures the human can approve their own PRs without bypassing branch rules.
+    Run Memtrace review against the synchronized graph.
 
 14. Schubert creates session handout. SESSION ENDS.
 ```
