@@ -102,7 +102,12 @@ Every leaf task flows through this cycle:
     This ensures the human can approve their own PRs without bypassing branch rules.
     Run Memtrace review against the synchronized graph.
 
-14. Schubert creates session handout. SESSION ENDS.
+ 14. Schubert creates session handout. SESSION ENDS.
+
+15. Bernstein commits framework-state changes (task file status, phase plan
+     status) directly to the default branch. These are NOT left in the task
+     PR — the next session must see the authoritative task status regardless
+     of whether the PR is merged yet.
 ```
 
 ### Bootstrap Exception (Documentation-Only Tasks)

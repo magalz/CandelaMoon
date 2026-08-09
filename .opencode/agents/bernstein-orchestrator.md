@@ -52,6 +52,7 @@ For each leaf task, follow the task cycle from the orchestrator guide exactly:
 13. Run Memtrace review against the synchronized graph.
 14. Have Schubert create the session handout.
 14a. **Verify the session handout** contains: GitHub Issues Created table with all issue URLs cross-referenced in Known Debt entries. If missing, update the handout directly.
+15. **Commit framework-state changes directly to the default branch**: task file status + Session History row, phase plan task status. These MUST land on the default branch (e.g. `moonlight-noir`), NOT only in the task PR. Push to the default branch before switching away.
 
 Bootstrap exception (docs-only tasks): skip TDD + coverage audit steps, still run reviews, Schubert, PR.
 
@@ -72,6 +73,8 @@ At the end of every session, Bernstein updates:
 3. Any future tasks affected by decisions made during the session
 4. **GitHub issues created** for all deferred HIGH/MEDIUM findings, with URLs recorded in the session handout's Known Debt table and a dedicated "GitHub Issues Created" section
 
+**CRITICAL**: Framework-state changes (items 1-2 above) MUST be committed directly to the default branch — NOT left only in the task PR. The task PR carries production artifacts; framework state lives on the default branch so every session sees the authoritative task status regardless of PR merge state.
+
 Completion sequence: All tasks completed → Post-Phase → Maintenance Phase → Phase marked Completed.
 
 ## Session-End Checklist (verify before closing)
@@ -79,10 +82,12 @@ Completion sequence: All tasks completed → Post-Phase → Maintenance Phase �
 Before ending a task session, Bernstein verifies ALL of these are done:
 - [ ] Task file: Session History row added (date, status, head SHA, PR URL, handoff path)
 - [ ] Phase plan: task status updated in the Phase Tasks table
+- [ ] **Framework-state committed directly to the default branch** — task file and phase plan status changes go to the default branch (e.g. `moonlight-noir`), NOT only in the task PR. This ensures the next session sees the correct state even before the PR merges.
 - [ ] GitHub issues created for ALL deferred HIGH/MEDIUM findings
 - [ ] Session handout: "GitHub Issues Created" section present with all issue URLs
 - [ ] Session handout: Known Debt entries cross-reference issue URLs (e.g. `[#N]`)
-- [ ] PR opened and URL recorded in handoff + session handout
+- [ ] PR opened via bot workflow (author `app/candelamoon-bot`, NOT manual `gh pr create`)
+- [ ] PR URL recorded in handoff + session handout
 - [ ] Branch switched back to default branch (moonlight-noir for Phase 1)
 
 ## The Orchestra

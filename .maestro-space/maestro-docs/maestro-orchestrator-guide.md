@@ -293,6 +293,14 @@ Bernstein MUST update:
 2. **Phase plan**: Update task status in the Phase Tasks table.
 3. **Session handout**: Schubert produces this. Bernstein verifies it exists.
 
+**Where these updates land**: Items 1 and 2 are framework-state changes. They MUST be
+committed directly to the default branch (e.g. `moonlight-noir`), NOT left only in
+the task PR branch. The task PR carries production artifacts (code, Containerfiles,
+toolchain pins); the phase plan and task file status are authoritative state that
+every session must read from the default branch regardless of PR merge status. If
+they only exist in an unmerged PR, the next session will see stale "Pending" status
+and may attempt to re-dispatch an already-completed task.
+
 ### 8.2 Session Adjustments
 
 Decisions made during a session that affect future tasks must be propagated:
