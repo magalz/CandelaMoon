@@ -58,7 +58,7 @@ Define 4 image roles: candelamoon-android (JDK 17, Android SDK 36, NDK 27, Gradl
 - **Network policy**: `--network=none` is the default for every step; steps that need network declare it explicitly (see per-image "run-time network") via `--network=host` or an allowlisted proxy. Image *build* time may need network (package downloads) and is documented per image.
 
 ### candelamoon-android
-- **Containerfile**: `infra/containers/candelamoon-android/Containerfile`
+- **Containerfile**: `infra/containers/candelamoon-android/Containerfile` *(implemented per P1-001; green-verified 2026-08-08, review phases 1+2 closed, STR-06 applied 2026-08-08. See handoff at `.maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/handoff.md`.)*
 - **Base image**: `docker.io/eclipse-temurin:17-jdk@sha256:<DIGEST android>` (see toolchain-pins.md)
 - **Installed tools**: JDK 17 (from base); Android SDK - cmdline-tools 16.0, platform-tools 36.x, `platforms;android-36`, `build-tools;36.0.0`, licenses pre-accepted at build time; NDK `27.0.12077973`; CMake 3.22.1 + Ninja (NDK-bundled); Gradle 8.13 (distribution pre-downloaded into `GRADLE_USER_HOME` at build time so builds run offline); Robolectric: `android-all` jars pre-fetched into the Gradle cache at build time (otherwise the first unit-test run hits the network).
 - **Purpose**: unit/Robolectric tests, lint, native build, APK assembly. Compiles `app` for all flavors (`root`, `nonRoot_game`).

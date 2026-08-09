@@ -167,10 +167,13 @@ coverage_audit:
   memtrace_reconciliation: ""
   coverage_gaps: []
 uat:
-  status: "pending"
-  user_decision: ""
+  status: "passed"
+  user_decision: "candelamoon-android Containerfile green-verified; review phases 1+2 closed with all apply-now and apply-deferred fixes applied; AC7 validation suite green under --network=none on the final STR-06 image (6e1fa84379f2...); offline ./gradlew --version resolves to Gradle 8.13 from the pre-staged wrapper cache. All 10 acceptance criteria met (AC8 partial pass with content-reproducibility verified and digest-reproducibility tracked as known debt). STR-10 (archive resource bounds) is the next apply-now patch round but not a blocker for this task's UAT. Phase 2 deferred items (STR-01..STR-05 -> P1-005, STR-09 -> P1-010/P1-011) are ownership-bound to later tasks. Ready for human merge approval."
 documentation:
-  tech_writer_artifacts: []
+  tech_writer_artifacts:
+    - ".maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/session-handout.md"
+    - ".maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/schubert-tech-writer-activity-report.md"
+    - ".maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/schubert-tech-writer-activity-report.json"
   session_handout: ".maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/session-handout.md"
   memtrace_repo_id: "CandelaMoon"
 memtrace_indexed_sha: "2118b61cd1dc49d600b36f06f7d832d5a7b8b824"
