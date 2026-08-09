@@ -6,7 +6,7 @@ status: "green-verified"
 repository: "magalz/CandelaMoon"
 branch: "moonlight-noir"
 base_sha: "2118b61cd1dc49d600b36f06f7d832d5a7b8b824"
-head_sha: "9c32ba5f510cc3fae63e8c3792352cfaf0b5d3fd"
+head_sha: "ddf6d5c4900cc7b17422a1b459ef83b375767325"
 pr_url: ""
 acceptance_criteria:
   - "AC1: Containerfile exists at `infra/containers/candelamoon-android/Containerfile`."
@@ -99,8 +99,68 @@ review_phase_1:
 review_phase_2:
   red_team_findings: []
   blue_team_findings: []
-  triaged_findings: []
-  fixes_applied: false
+  triaged_findings:
+    - id: "STR-01"
+      title: "Base-image provenance remains unverified"
+      finding_ids: ["STR-01"]
+      severity: "high"
+      disposition: "defer-to-CI (P1-005)"
+      detail: "Digest pinning selects bytes, not publisher identity. The protected P1-005 publication job must verify the base reference against an allowlisted Eclipse Temurin publisher identity/attestation, generate the SBOM, run the vulnerability policy, and sign/push only after all gates pass. Not part of this dispatch."
+    - id: "STR-02"
+      title: "APT package selection can drift through the inherited repository"
+      finding_ids: ["STR-02"]
+      severity: "medium"
+      disposition: "defer-to-CI (P1-005)"
+      detail: "Live unversioned APT metadata could resolve trojanized packages. P1-005 must emit an SBOM with every APT package/version, compare with the approved toolchain baseline, run the vulnerability policy, and block publication on drift or scan failure. Not part of this dispatch."
+    - id: "STR-03"
+      title: "Root-executed Android SDK content lacks an independent publication gate"
+      finding_ids: ["STR-03"]
+      severity: "high"
+      disposition: "defer-to-CI (P1-005)"
+      detail: "A malicious cmdline-tools archive or SDK package executes as root during construction. P1-005 must require the SBOM to enumerate all Android components, run the vulnerability policy, attach provenance/SBOM, and sign/publish only on success. Not part of this dispatch."
+    - id: "STR-04"
+      title: "Gradle distribution provenance is deferred to the publication gate"
+      finding_ids: ["STR-04"]
+      severity: "high"
+      disposition: "defer-to-CI (P1-005)"
+      detail: "A modified Gradle 8.13 ZIP would be loaded as Java code by ./gradlew. Existing SHA-256 TODO stays; P1-005 SBOM must identify and compare the distribution against the approved toolchain entry. STR-06 cache controls must prevent later replacement. Not part of this dispatch."
+    - id: "STR-05"
+      title: "Robolectric artifacts remain a publication-gate concern"
+      finding_ids: ["STR-05"]
+      severity: "high"
+      disposition: "defer-to-CI (P1-005)"
+      detail: "A malicious but valid ZIP/JAR passes unzip -tq and is loaded by Robolectric. P1-005 must include all nine android-all-instrumented coordinates in the SBOM, compare against the Robolectric 4.16 mapping, and fail publication on drift or missing gate. Not part of this dispatch."
+    - id: "STR-06"
+      title: "Builder-writable tool trees and shared caches permit cross-trust poisoning"
+      finding_ids: ["STR-06"]
+      severity: "high (highest practical priority)"
+      disposition: "open — apply-now, separate dispatch"
+      detail: "Replace chown -R builder:builder /opt/android-sdk /opt/gradle with root-owned go-w tool trees (per Brahms' inline mitigation) and enforce read-only/trust-scoped caches in P1-010/P1-011. Brahms rates this the highest-priority practical control; NOT part of this STR-07/STR-08 dispatch — recommended as the next patch round."
+    - id: "STR-07"
+      title: "Credential-bearing files should be excluded from the build context"
+      finding_ids: ["STR-07"]
+      severity: "medium"
+      disposition: "applied"
+      detail: "Expanded the secrets block of .containerignore with the full STR-07 pattern set: gradle.properties, **/gradle.properties, .netrc, **/.netrc, .m2/settings.xml, **/.m2/settings.xml, .ssh/, **/.ssh/, .ssh/id_*, **/.ssh/id_*, .aws/, **/.aws/, **/credentials, **/credentials.*, terraform.tfvars(.json), **/terraform.tfvars(.json), *.pfx, **/*.pfx. Verified by diff review; the no-COPY build is unaffected (build still green)."
+    - id: "STR-08"
+      title: "Normalize and fail closed on a pre-existing builder account"
+      finding_ids: ["STR-08"]
+      severity: "medium"
+      disposition: "applied"
+      detail: "Existing-builder branch now forces primary group to GID 1000 (usermod --gid 1000, tolerant), strips supplementary groups (usermod --groups builder), locks the password (usermod --lock), asserts id -G = 1000 only, and fails the build if /etc/sudoers or /etc/sudoers.d names builder or %builder. The ubuntu-rename branch gains the same password lock (its -G builder strip is the --groups equivalent). Micro-verified in isolation: hostile base with builder + sudo/video/dialout groups + sudoers rule fails the build with 'ERROR: builder has sudoers entries'; without a sudoers rule the block completes and leaves groups=1000(builder), password locked. Full build: uid=1000(builder) gid=1000(builder) groups=1000(builder), passwd -S builder -> L."
+    - id: "STR-09"
+      title: "Keep hostile builds off the host-facing checkout mount"
+      finding_ids: ["STR-09"]
+      severity: "medium"
+      disposition: "defer-to-CI (P1-010/P1-011)"
+      detail: "Rootless keep-id means a hostile PR can rewrite a writable /workspace bind mount. P1-010/P1-011 must bind the checkout read-only, run --read-only with a builder-owned ephemeral workspace, and never mount sockets/credentials. An image cannot enforce bind-mount flags, so this is a CI-level control. Not part of this dispatch."
+    - id: "STR-10"
+      title: "Bound archive download and extraction resources"
+      finding_ids: ["STR-10"]
+      severity: "low"
+      disposition: "open — apply-now, separate dispatch"
+      detail: "Add a guarded-download/check-zip helper with size/entry-count/expansion budgets per archive (cmdline-tools 512MiB/2GiB/100k, platform-tools 256MiB/1GiB/50k, Gradle 512MiB/2GiB/100k, Robolectric 512MiB/2GiB/250k) and free-space checks before unzip. NOT part of this STR-07/STR-08 dispatch — recommended for a follow-up patch round."
+  fixes_applied: true
 coverage_audit:
   rating: ""
   risk_weighted_score: 0
@@ -338,3 +398,63 @@ Full logs: `%TEMP%/opencode/p1-001-verify/build-review.log`, `build-review2.log`
 #### Handoff to
 
 Bernstein: Review Phase 1 fixes are applied and green-verified (build + AC7 commands + offline gradlew). Ready for Review Phase 2 (red team / blue team) or a re-review pass; remaining open findings listed above under Known Issues #5.
+
+### Bach — Senior Developer (2026-08-09) — Review Phase 2 patch round (STR-07, STR-08)
+
+#### Environment
+
+- Host: Windows 11 10.0.26200, WSL2 backend (podman-machine-default, 8 vCPU / 8 GiB RAM / 100 GiB disk)
+- Podman: 5.8.3 (rootless, WSL2); base image `docker.io/eclipse-temurin:17-jdk@sha256:23441a35...` cached locally (`--pull=never`)
+- Built image: `localhost/candelamoon-android:phase2` (id `f039d5aeb08ba406853fd88cee3cc3173d5e0bf96e749c32c3d3971cc578105b`)
+
+#### Actions
+
+1. Read the handoff, Brahms Phase 2 findings (STR-01..STR-10) and the current `.containerignore` + Containerfile.
+2. **PATCH 1 (STR-07)**: appended the full credential pattern set to the `.containerignore` secrets block under the `# Gradle/Maven credential files` comment (gradle.properties, .netrc, .m2/settings.xml, .ssh/, .aws/, **/credentials, **/credentials.*, terraform.tfvars(.json), *.pfx — root and `**/` variants exactly as dispatched).
+3. **PATCH 2 (STR-08)**: hardened the existing-builder branch of the account RUN (after the uid/gid assertions): (1) `usermod --gid 1000 builder 2>/dev/null || true`, (2) `usermod --groups builder builder`, (3) `usermod --lock builder`, (4) assert `[ "$(id -G builder)" = "1000" ]`, (5) fail closed on `grep -rq '^builder\b\|^%builder\b' /etc/sudoers /etc/sudoers.d/`. Applied `usermod --lock builder` to the ubuntu-rename branch too (its existing `usermod -G builder builder` is the `--groups builder` strip, so only the lock was missing there). Every step carries an inline comment.
+4. **Red-phase micro-verification of the existing-builder branch in isolation** (the real base ships `ubuntu`, so the branch is latent): extracted the exact account RUN block from the Containerfile into a script and ran it inside two micro-test images built from the same pinned base:
+   - Negative (base A: pre-existing builder with sudo/video/dialout groups + `/etc/sudoers.d/90-builder` rule): the block failed with `ERROR: builder has sudoers entries`, exit 1 — fail-closed confirmed.
+   - Positive (base B: same groups, no sudoers rule): the block completed; `id builder` → `uid=1000(builder) gid=1000(builder) groups=1000(builder)` (sudo/video/dialout stripped), `passwd -S builder` → `L` (locked).
+   - Shell syntax of the extracted block validated with `bash -n` (via WSL).
+5. **Green phase**: `podman build --pull=never -t candelamoon-android:phase2 -f infra/containers/candelamoon-android/Containerfile .` — 18/18 steps, tagged successfully.
+6. Ran the dispatch verification under `--network=none` (see Verification table).
+7. Committed the code changes (`ddf6d5c4`), then updated this handoff (`head_sha`, `review_phase_2.triaged_findings` STR-01..STR-10, `review_phase_2.fixes_applied: true`, this section) and wrote the activity report (JSON + MD).
+
+#### Files
+
+- Modified: `.containerignore` — STR-07 credential patterns (21 lines added to the secrets block)
+- Modified: `infra/containers/candelamoon-android/Containerfile` — STR-08 account hardening (existing-builder branch + rename-branch lock, 23 lines added)
+- Modified: `.maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/handoff.md` — head_sha, review_phase_2, this section
+- Created: `.maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/bach-senior-developer-activity-report-phase2.md` / `.json` — activity report
+- Read (context): `findings-phase-2-brahms.md` / `.json`, `findings-phase-2-stravinsky.md` / `.json`
+- Test artifacts (outside the repo, `%TEMP%/opencode/p1-001-str08/`): micro-base-a/b Containerfiles, `account-block.sh` (exact extracted block), micro-test logs
+
+#### Verification
+
+| Command | Expected | Observed |
+|---|---|---|
+| micro-test A: `podman run --rm --network=none -v account-block.sh:/tmp/... p1-001-str08-base-a bash /tmp/account-block.sh` (base has sudoers rule) | build/block FAILS with `ERROR: builder has sudoers entries`, exit 1 | exit 1; `-x` trace shows uid/gid asserts → `usermod --gid 1000` → `--groups builder` → `--lock` → `id -G = 1000` assert → grep finds rule → `ERROR: builder has sudoers entries` → `exit 1` |
+| micro-test B: same block on base without sudoers rule | completes; groups stripped; locked | `uid=1000(builder) gid=1000(builder) groups=1000(builder)`; `passwd -S builder` → `L`; sudo/video/dialout groups no longer list builder |
+| `podman build --pull=never -t candelamoon-android:phase2 -f infra/containers/candelamoon-android/Containerfile .` | build succeeds | 18/18 steps, `Successfully tagged localhost/candelamoon-android:phase2` (id `f039d5aeb08b...`) |
+| `podman run --rm --network=none candelamoon-android:phase2 id` | only `groups=1000(builder)` | `uid=1000(builder) gid=1000(builder) groups=1000(builder)` |
+| `podman run --rm --network=none candelamoon-android:phase2 bash -c 'passwd -S builder; id -nG'` | locked; no supplementary groups | `builder L 2026-07-24 ...`; `builder` |
+| `podman run --rm --network=none candelamoon-android:phase2 java -version` (regression) | Temurin 17 | `openjdk 17.0.19` / `Temurin-17.0.19+10` |
+| `git diff` of both patched files | only STR-07/STR-08 hunks | 21 lines added to `.containerignore`, 23 to the Containerfile, nothing else |
+
+Full logs: `%TEMP%/opencode/p1-001-str08/` (micro-test containers + block script).
+
+#### Deviations
+
+1. **STR-08 sudoers check placed in the existing-builder branch only** — the dispatch listed all five hardening steps for the existing-builder branch and only the lock + group strip for the rename branch. The rename branch strips groups via the pre-existing `usermod -G builder builder` (identical to `--groups builder`), so only `usermod --lock builder` was added there; the sudoers/`id -G` assertions were not duplicated into the rename branch (the rename path provably cannot carry a `builder`-named sudoers rule because `usermod -l` does not rewrite sudoers). If Brahms wants the sudoers check on every branch, it is a one-line move.
+2. **`usermod --gid 1000` kept tolerant (`2>/dev/null || true`)** — per dispatch wording; the pre-existing `id -g` assertion already fails the build on gid mismatch, so the tolerant usermod is belt-and-suspenders normalization, not the gate.
+3. **Existing-builder branch exercised via micro-test, not the real build** — the pinned base ships `ubuntu` (rename branch), so the hardened branch is latent in the real image; the micro-test images built from the same pinned base provide the red-phase evidence for it.
+
+#### Known Issues
+
+1. **STR-06 (builder-writable tool trees) and STR-10 (archive resource bounds) remain OPEN** — both are `apply-now` per Brahms but were not part of this STR-07/STR-08 dispatch; recorded in `review_phase_2.triaged_findings` with `disposition: open — apply-now, separate dispatch`. STR-06 is Brahms' highest-practical-priority control and should be the next patch round.
+2. **STR-01..STR-05 deferred to P1-005, STR-09 deferred to P1-010/P1-011** — per Brahms' ownership boundaries; recorded in `review_phase_2.triaged_findings`.
+3. **Phase 1 known debt unchanged** — AC8 image-digest reproducibility, download SHA-256 TODOs, platform-tools 37.0.1 pin, Robolectric 4.16 mapping sensitivity (see prior sections).
+
+#### Handoff to
+
+Bernstein: Phase 2 security patches STR-07/STR-08 applied and green-verified (micro red-phase tests + full build + `--network=none` `id`). Phase 2 triage recorded for all ten STR findings. Recommended next round: STR-06 (apply-now, highest priority), then STR-10.

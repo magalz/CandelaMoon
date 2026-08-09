@@ -1,0 +1,94 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "activity-report",
+  "agent": {
+    "name": "Bach (Senior Developer)",
+    "role": "Senior Developer — implements handoff tasks with TDD discipline, applies review patches, verifies with build + runtime evidence",
+    "subagent_type": "bach-senior-developer",
+    "dispatched_by": "Bernstein (orchestrator)",
+    "task_id": "P1-001"
+  },
+  "task": {
+    "change_id": "P1-001",
+    "phase": "Phase 1",
+    "phase_short": "phase-1-delivery-system",
+    "branch": "moonlight-noir",
+    "base_sha": "7222424731d87f4b5e1833152a58f944be212584",
+    "head_sha": "ddf6d5c4900cc7b17422a1b459ef83b375767325",
+    "pr_url": ""
+  },
+  "data": {
+    "actions": [
+      "Read handoff, Brahms Phase 2 findings (STR-01..STR-10) and Stravinsky Phase 2 findings, current .containerignore and Containerfile.",
+      "PATCH 1 (STR-07): appended the full credential pattern set to the .containerignore secrets block under the '# Gradle/Maven credential files' comment: gradle.properties, **/gradle.properties, .netrc, **/.netrc, .m2/settings.xml, **/.m2/settings.xml, .ssh/, **/.ssh/, .ssh/id_*, **/.ssh/id_*, .aws/, **/.aws/, **/credentials, **/credentials.*, terraform.tfvars, terraform.tfvars.json, **/terraform.tfvars, **/terraform.tfvars.json, *.pfx, **/*.pfx (exactly as dispatched).",
+      "PATCH 2 (STR-08): hardened the existing-builder branch of the account RUN after the uid/gid assertions: (1) usermod --gid 1000 builder 2>/dev/null || true (force primary group to GID 1000, tolerant); (2) usermod --groups builder builder (strip supplementary groups); (3) usermod --lock builder (lock password); (4) assert [ \"$(id -G builder)\" = \"1000\" ]; (5) fail closed via ! grep -rq '^builder\\b\\|^%builder\\b' /etc/sudoers /etc/sudoers.d/ 2>/dev/null || { echo ERROR; exit 1; }. Each step has an inline comment.",
+      "Applied usermod --lock builder to the ubuntu-rename branch for consistency (its existing usermod -G builder builder already performs the --groups builder strip).",
+      "Red-phase micro-verification of the existing-builder branch in isolation (the pinned base ships ubuntu, so the branch is latent in the real build): extracted the exact account RUN block from the Containerfile into account-block.sh (verified with bash -n via WSL), built two micro-test base images from the same pinned base, and ran the block inside each under --network=none.",
+      "Micro-test A (hostile base: pre-existing builder with sudo/video/dialout groups AND /etc/sudoers.d/90-builder rule): the block FAILED with 'ERROR: builder has sudoers entries', exit 1 — fail-closed behavior confirmed; the -x trace shows the ordered normalization (gid assert, --gid 1000, --groups builder, --lock, id -G assert) then the sudoers gate.",
+      "Micro-test B (same groups, no sudoers rule): the block completed (exit 0); post-block id builder -> uid=1000(builder) gid=1000(builder) groups=1000(builder); passwd -S builder -> L (locked); sudo/video/dialout group memberships no longer include builder.",
+      "Green phase: podman build --pull=never -t candelamoon-android:phase2 -f infra/containers/candelamoon-android/Containerfile . -> 18/18 steps, Successfully tagged localhost/candelamoon-android:phase2 (id f039d5aeb08b...).",
+      "Dispatch verification under --network=none: id -> uid=1000(builder) gid=1000(builder) groups=1000(builder); passwd -S builder -> L; id -nG -> builder; java -version regression -> openjdk 17.0.19 / Temurin-17.0.19+10; /workspace builder:builder 755.",
+      "Committed code changes (ddf6d5c4), updated handoff (head_sha, review_phase_2.triaged_findings for STR-01..STR-10, review_phase_2.fixes_applied: true, Agent Output section), wrote this report."
+    ],
+    "files": {
+      "created": [
+        ".maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/bach-senior-developer-activity-report-phase2.md",
+        ".maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/bach-senior-developer-activity-report-phase2.json"
+      ],
+      "modified": [
+        ".containerignore",
+        "infra/containers/candelamoon-android/Containerfile",
+        ".maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/handoff.md"
+      ]
+    },
+    "verification": {
+      "commit": {
+        "sha": "ddf6d5c4900cc7b17422a1b459ef83b375767325",
+        "message": "fix(infra): apply phase-2 security patches STR-07/STR-08 (P1-001)"
+      },
+      "micro_test_negative": {
+        "base": "p1-001-str08-base-a (pinned base + builder with sudo/video/dialout groups + /etc/sudoers.d/90-builder)",
+        "command": "podman run --rm --network=none -v account-block.sh:/tmp/account-block.sh:ro p1-001-str08-base-a bash /tmp/account-block.sh",
+        "expected": "block fails closed with 'ERROR: builder has sudoers entries', exit 1",
+        "observed": "exit 1; -x trace: uid/gid asserts -> usermod --gid 1000 -> --groups builder -> --lock -> [ id -G = 1000 ] -> grep finds rule -> ERROR -> exit 1"
+      },
+      "micro_test_positive": {
+        "base": "p1-001-str08-base-b (pinned base + builder with sudo/video/dialout groups, NO sudoers rule)",
+        "command": "podman run --rm --network=none -v account-block.sh:/tmp/account-block.sh:ro p1-001-str08-base-b bash -c 'bash /tmp/account-block.sh && id builder && passwd -S builder'",
+        "observed": "exit 0; uid=1000(builder) gid=1000(builder) groups=1000(builder); passwd -S builder -> L; sudo/video/dialout no longer list builder as member"
+      },
+      "shell_syntax_check": {
+        "command": "wsl -e bash -n /mnt/c/.../account-block.sh (exact extracted account RUN block, LF line endings)",
+        "result": "SYNTAX OK"
+      },
+      "build": {
+        "command": "podman build --pull=never -t candelamoon-android:phase2 -f infra/containers/candelamoon-android/Containerfile .",
+        "result": "success (18/18 steps)",
+        "image_id": "f039d5aeb08ba406853fd88cee3cc3173d5e0bf96e749c32c3d3971cc578105b"
+      },
+      "runtime_checks": {
+        "id_observed": "uid=1000(builder) gid=1000(builder) groups=1000(builder)",
+        "passwd_status": "builder L 2026-07-24 0 99999 7 -1 (locked)",
+        "id_nG_observed": "builder (no supplementary groups)",
+        "java_observed": "openjdk 17.0.19 (2026-04-21) / Temurin-17.0.19+10",
+        "workspace_observed": "/workspace builder:builder 755"
+      },
+      "diff_scope": "git diff shows only the STR-07 hunk (.containerignore, +21) and STR-08 hunks (Containerfile, +23); no other files touched in the commit",
+      "logs": [
+        "%TEMP%/opencode/p1-001-str08/ (micro-base-a/b Containerfiles, account-block.sh, micro-test runs)"
+      ]
+    },
+    "deviations": [
+      "STR-08 sudoers/`id -G` assertions placed in the existing-builder branch only (per dispatch); the rename branch received only the password lock because its existing `usermod -G builder builder` already performs the `--groups builder` strip. If Brahms wants the sudoers check on every branch, it is a one-line move (usermod -l does not rewrite sudoers, so the rename path cannot carry a builder-named rule).",
+      "usermod --gid 1000 kept tolerant (2>/dev/null || true) per dispatch wording; the pre-existing `id -g` assertion remains the hard gate.",
+      "Existing-builder branch exercised via micro-test images built from the same pinned base (the real base ships ubuntu, so that branch is latent in the full build)."
+    ],
+    "known_issues": [
+      "STR-06 (builder-writable tool trees) and STR-10 (archive resource bounds) remain OPEN with Brahms disposition apply-now; recorded in review_phase_2.triaged_findings as 'open — apply-now, separate dispatch'. STR-06 is Brahms' highest-practical-priority control and is recommended as the next patch round.",
+      "STR-01..STR-05 deferred to P1-005 (protected publication gate); STR-09 deferred to P1-010/P1-011 (mount/trust segregation).",
+      "Phase 1 known debt unchanged: AC8 image DIGEST not bit-reproducible, download SHA-256 TODOs, platform-tools 37.0.1 direct-archive pin, Robolectric 4.16 mapping sensitivity."
+    ]
+  },
+  "emitted_at": "2026-08-09T00:30:00Z",
+  "narrative_path": ".maestro-space/maestro-works/phase-1-delivery-system/p1-001-candelamoon-android-containerfile/bach-senior-developer-activity-report-phase2.md"
+}
