@@ -13,47 +13,45 @@
     "phase": "Phase 1",
     "phase_short": "phase-1-delivery-system",
     "branch": "phase1/p1-002-candelamoon-docs-containerfile",
-    "base_sha": "e37c8c189b2505b11e36093c629fe6430839031f",
-    "head_sha": "ff6c64d00340498c0c42d29f547b8c5bee65554b",
+    "base_sha": "0c80776971c86ddbfe60232cdfe9cdb4ebd42331",
+    "head_sha": "91bd8403ad75a8d8b410ca4c48a172549f382302",
     "pr_url": ""
   },
   "data": {
     "actions": [
-      "Read the handoff, agent identity file, activity-report template + agent-output.schema.json, all three findings reports (Berlioz B-01..B-18, Bartok BAR-001..BAR-015, Verdi A-01..A-03), the P1-001 handoff (triaged_findings format precedent), and ci-architecture.md sections candelamoon-docs / Common conventions.",
-      "PATCH 1 (B-06/BAR-003/BAR-004): generated infra/containers/candelamoon-docs/requirements.lock (9 packages, --hash=sha256 per artifact) via uv pip compile --generate-hashes --python-version 3.11 --python-platform x86_64-unknown-linux-gnu; verified the resolved set matches the recorded in-image pip freeze (packaging==26.3 confirmed pre-installed in the base image itself). Containerfile pip step now installs with --require-hashes --no-deps from the lock; requirements.txt header and toolchain-pins.md section Python updated.",
-      "PATCH 2 (B-07/BAR-005): created package.json (markdownlint-cli 0.45.0, markdown-link-check 3.13.7 exact) and generated package-lock.json (lockfileVersion 3, 165 packages, integrity hashes) via npm install --package-lock-only. Rewrote the npm step: COPY both files, npm ci --ignore-scripts in a staging dir, copy locked tree into /opt/node/lib/node_modules, wire /opt/node/bin symlinks (markdownlint, markdown-link-check), npm cache clean --force + _logs/_cacache removal still runs.",
-      "PATCH 3 (B-11/BAR-013): removed PIP_NO_CACHE_DIR=1 from the ENV block; the build pip RUN carries --no-cache-dir alone. Verified printenv PIP_NO_CACHE_DIR unset at runtime.",
-      "PATCH 4 (B-12/BAR-010): moved mkdir -p /workspace && chown builder:builder /workspace BEFORE the mtime-normalization pass and added /workspace to the find -exec touch roots. Verified /workspace mtime 2025-01-01 00:00:00 UTC, owner builder:builder.",
-      "PATCHES 5/6/7/10 (B-14/BAR-007, B-15/BAR-006, B-16/BAR-008, BAR-015): rewrote validate-design with anchored exact-version patterns, real module imports for jsonschema/pyyaml (split into two checks), strict argument validation (unknown/extra args -> usage on stderr, exit 2), and timeout 30 per probe with a distinct exit-124 report.",
-      "PATCH 8 (B-17): CMD changed from [\"bash\"] to [\"validate-design\"] with an --entrypoint bash note; bare podman run now validates by default.",
-      "PATCH 9 (BAR-009): rewrote the sudoers guard as an explicit per-path loop; first build failed with '/bin/sh: syntax error expecting done' (multi-line loop inside a backslash-continued RUN body), collapsed to a single shell line; second build green.",
-      "PATCH 11 (B-03/B-04/A-02): added the consolidated 5-domain build-time network allowlist comment block (pypi.org, files.pythonhosted.org, registry.npmjs.org, nodejs.org, deb.debian.org) to the Containerfile header; updated handoff AC5.",
-      "Built podman build --pull=never -t candelamoon-docs:review -f infra/containers/candelamoon-docs/Containerfile . -> 20/20 steps, Successfully tagged localhost/candelamoon-docs:review (id d3c7f79d9df29fe780b197f09c2a817739c5f71a678edd0fcf1d33c3578d6b96, 769,460,929 bytes).",
-      "Verified the AC7 suite under --network=none plus negative paths: unknown arg -> exit 2 with usage; extra args -> exit 2 with usage; in-image timeout 1 sleep 5 -> rc 124; sudoers loop no false positive; PIP_NO_CACHE_DIR unset; /workspace mtime normalized.",
-      "Reproducibility: second --no-cache build (review2) -> identical find file lists, identical counts/bytes per tree (/opt/node 11169/231786503, /usr/local 2867/45963238, /home/builder 4/0, /workspace 1/0), identical pip freeze md5 a6a8985a..., identical image size 769,460,929 bytes; digests differ (Podman gzip non-determinism, known debt). Removed review2.",
-      "Committed the code changes (ff6c64d0), updated the handoff (head_sha, AC5, implementation_artifacts, review_phase_1.triaged_findings with 11 applied + 3 deferred + 8 dismissed, fixes_applied: true, known_debt, Agent Output section) and wrote this activity report (JSON + MD)."
+      "Read the handoff, agent identity file, activity-report template + agent-output.schema.json, both Phase 2 findings reports (findings-phase-2-stravinsky.md SEC-01..SEC-07, findings-phase-2-brahms.md dispositions), the P1-021 handoff (findings-array format precedent), and the current Containerfile / validate-design.",
+      "SEC-01 (validate-design): added 'cd /' at startup (after set -eu) so no check ever runs with the bind-mounted repository as its working directory; changed the jsonschema and pyyaml checks to 'python3 -I -c \"import ...; print(...__version__)\"' (isolated mode - CWD, PYTHONPATH, and user site-packages are NOT on sys.path); documented the isolation rule in the script header and at both checks, including the P1-017 requirement (image-path imports, explicit /workspace paths).",
+      "SEC-02 (Containerfile): moved the entire non-root builder-user section (groupadd/useradd/usermod --lock, supplementary-group reset, uid/gid asserts, sudoers loop, /home/builder contract) ABOVE the Python pip section; rewrote the pip section as a two-phase flow: COPY --chown=builder:builder of requirements.lock, USER builder 'python3 -m pip download --no-cache-dir --require-hashes --no-deps --only-binary=:all: -r /tmp/requirements.lock -d /tmp/pip-wheelhouse' with fail-closed wheelhouse assertions (non-empty, only .whl), USER root offline 'python3 -m pip install --no-cache-dir --require-hashes --no-deps --only-binary=:all: --no-index --find-links=/tmp/pip-wheelhouse -r /tmp/requirements.lock', then rm -rf the wheelhouse and lock. Extended the section comment with the root/builder split and wheel-only policy; updated the final-USER comment to document the temporary switches.",
+      "Built podman build --pull=never -t candelamoon-docs:phase2 -f infra/containers/candelamoon-docs/Containerfile . -> 23/23 steps green (20 -> 23: USER builder / USER root / COPY--chown layers).",
+      "Verified the full AC7 suite under --network=none, pip freeze vs the locked set, wheelhouse cleanup (/tmp clean in the image), /home/builder hygiene (3 skeleton files + empty .cache/.npm, no pip cache baked), negative paths (unknown arg / extra args -> exit 2), and default-CMD behavior.",
+      "SEC-01 proof: red-phase on the pre-fix image (candelamoon-docs:review) - /workspace/jsonschema.py with print('PWNED-JSONSCHEMA') + spoofed __version__ = '4.23.0' -> 'OK: jsonschema PWNED-JSONSCHEMA', exit 0 (attacker code executed AND false green). Green-phase on the new image: same hostile files (jsonschema.py + yaml.py) -> exit 0 with real modules, no PWNED output anywhere.",
+      "Reproducibility: second --no-cache build (phase2-repro) -> identical per-tree file counts/bytes, identical pip freeze md5 a6a8985a... (same as the phase-1 review round), identical full file-list md5 dca115fa..., Compare-Object clean; sizes 771,003,453 vs 771,003,454 bytes (1-byte Podman gzip non-determinism, known AC8 debt). Removed phase2-repro.",
+      "Committed the code changes (91bd8403), updated the handoff (head_sha, review_phase_1 findings arrays with file paths, review_phase_2 triage: 2 applied + 4 deferred-to-CI + 1 dismissed, fixes_applied: true, Agent Output section) and wrote this activity report (JSON + MD)."
     ],
     "files": {
-      "created": [
-        "infra/containers/candelamoon-docs/requirements.lock",
-        "infra/containers/candelamoon-docs/package.json",
-        "infra/containers/candelamoon-docs/package-lock.json",
-        ".maestro-space/maestro-works/phase-1-delivery-system/p1-002-candelamoon-docs-containerfile/bach-senior-developer-activity-report.md",
-        ".maestro-space/maestro-works/phase-1-delivery-system/p1-002-candelamoon-docs-containerfile/bach-senior-developer-activity-report.json"
-      ],
+      "created": [],
       "modified": [
         "infra/containers/candelamoon-docs/Containerfile",
         "infra/containers/candelamoon-docs/validate-design",
-        "infra/containers/candelamoon-docs/requirements.txt",
-        "docs/infrastructure/toolchain-pins.md",
-        ".maestro-space/maestro-works/phase-1-delivery-system/p1-002-candelamoon-docs-containerfile/handoff.md"
+        ".maestro-space/maestro-works/phase-1-delivery-system/p1-002-candelamoon-docs-containerfile/handoff.md",
+        ".maestro-space/maestro-works/phase-1-delivery-system/p1-002-candelamoon-docs-containerfile/bach-senior-developer-activity-report.md",
+        ".maestro-space/maestro-works/phase-1-delivery-system/p1-002-candelamoon-docs-containerfile/bach-senior-developer-activity-report.json"
       ]
     },
     "verification": {
-      "build_command": "podman build --pull=never -t candelamoon-docs:review -f infra/containers/candelamoon-docs/Containerfile .",
-      "build_result": "20/20 steps, Successfully tagged localhost/candelamoon-docs:review",
-      "built_image_id": "d3c7f79d9df29fe780b197f09c2a817739c5f71a678edd0fcf1d33c3578d6b96",
-      "built_image_size_bytes": 769460929,
+      "build_command": "podman build --pull=never -t candelamoon-docs:phase2 -f infra/containers/candelamoon-docs/Containerfile .",
+      "build_result": "23/23 steps, Successfully tagged localhost/candelamoon-docs:phase2",
+      "built_image_id": "127a1439acb4a1478c9da085ade5fe2dd04466111a187b8f44a930d28e2a9b20",
+      "built_image_size_bytes": 771003453,
+      "sec02_pip_flow": {
+        "download_phase_user": "builder (uid 1000)",
+        "download_command": "python3 -m pip download --no-cache-dir --require-hashes --no-deps --only-binary=:all: -r /tmp/requirements.lock -d /tmp/pip-wheelhouse",
+        "download_result": "9 wheels Saved to /tmp/pip-wheelhouse (incl. PyYAML-6.0.2-cp311-cp311-manylinux_2_17_x86_64.whl, rpds_py-2026.6.3-cp311-cp311-...whl); wheelhouse asserts passed (9/9 .whl)",
+        "install_phase_user": "root",
+        "install_command": "python3 -m pip install --no-cache-dir --require-hashes --no-deps --only-binary=:all: --no-index --find-links=/tmp/pip-wheelhouse -r /tmp/requirements.lock",
+        "install_result": "Looking in links: /tmp/pip-wheelhouse; all 9 wheels processed locally; rm -rf /tmp/pip-wheelhouse /tmp/requirements.lock ran",
+        "image_cleanup": "wheelhouse and lock absent from final image (/tmp has only node-compile-cache)"
+      },
       "ac7_network_none": {
         "python3": "Python 3.11.15",
         "node": "v22.23.2",
@@ -63,63 +61,56 @@
         "markdown_link_check": "3.13.7",
         "id": "uid=1000(builder) gid=1000(builder) groups=1000(builder)",
         "default_cmd": "exit 0; 'OK: all design validator tools present and runnable' (8/8 OK)",
-        "verbose": "8 OK lines with versions; jsonschema first line shows the 4.x DeprecationWarning (cosmetic)",
         "network_unreachable": "curl: (6) Could not resolve host: pypi.org (exit 6)"
       },
-      "negative_paths": {
-        "unknown_arg": "exit 2; 'ERROR: unknown argument: --verbsoe' + usage on stderr",
-        "extra_args": "exit 2; 'ERROR: too many arguments: --verbose extra' + usage on stderr",
-        "timeout_semantics": "in-image 'timeout 1 sleep 5' -> rc 124",
-        "sudoers_loop": "no sudoers entries for builder (no false positive)",
-        "pip_no_cache_dir_runtime": "unset (printenv rc 1)"
-      },
       "pip_lock": {
-        "generated_with": "uv pip compile --generate-hashes --python-version 3.11 --python-platform x86_64-unknown-linux-gnu requirements.txt",
-        "packages_locked": 9,
         "pip_freeze_entries": 10,
-        "packaging_origin": "pre-installed in python:3.11-slim base (verified via base pip freeze); not part of the lock",
-        "host_dry_run": "Would install PyYAML-6.0.2 jsonschema-4.23.0 pathspec-1.1.1 rpds-py-2026.6.3 typing_extensions-4.16.0 yamllint-1.37.1"
+        "matches_locked_set": true,
+        "packaging_origin": "pre-installed in python:3.11-slim base (not part of the lock)"
       },
-      "npm_lock": {
-        "generated_with": "npm install --package-lock-only (npm 11.13.0)",
-        "lockfile_version": 3,
-        "packages_locked": 165,
-        "install_mechanism": "npm ci --ignore-scripts + copy into /opt/node/lib/node_modules + bin symlinks",
-        "npm_ls_g_depth_0": "full 165-package tree listed; corepack@0.34.6, markdown-link-check@3.13.7, markdownlint-cli@0.45.0, npm@10.9.8 all present"
+      "negative_paths": {
+        "unknown_arg": "exit 2 (LASTEXITCODE=2), usage on stderr",
+        "extra_args": "exit 2, usage on stderr"
       },
-      "workspace_normalization": {
-        "mtime": "2025-01-01 00:00:00.000000000 +0000",
-        "owner": "builder:builder"
+      "home_builder_hygiene": {
+        "contents": "3 skeleton files (.bashrc/.profile/.bash_logout) + empty .cache/pip + .npm, all builder:builder",
+        "pip_cache_baked": false
+      },
+      "sec01_proof": {
+        "red_old_image": "candelamoon-docs:review - /workspace/jsonschema.py with print('PWNED-JSONSCHEMA') + spoofed __version__ = '4.23.0' -> 'OK: jsonschema PWNED-JSONSCHEMA', exit 0 (attacker code executed as builder AND false green)",
+        "green_new_image": "candelamoon-docs:phase2 - same jsonschema.py + yaml.py in /workspace, run from /workspace -> 8/8 OK, exit 0, real modules, no PWNED output",
+        "isolation_mechanism": "python3 -I (isolated mode: CWD/PYTHONPATH/user-site not on sys.path) + 'cd /' at script startup"
       },
       "reproducibility_two_builds": {
         "file_lists_identical": true,
         "tree_counts_bytes": {
-          "/opt/node": "11169 files / 231786503 bytes (both)",
-          "/usr/local": "2867 files / 45963238 bytes (both)",
-          "/home/builder": "4 files / 0 bytes (both)",
-          "/workspace": "1 file / 0 bytes (both)"
+          "/opt/node": "9446 files / 231786503 bytes (both)",
+          "/usr/local": "2446 files / 45964552 bytes (both)",
+          "/home/builder": "3 files / 4553 bytes (both)",
+          "/workspace": "0 files / 0 bytes (both)"
         },
-        "pip_freeze_md5": "a6a8985ae93cb0ae5bfbc36da7ad0cf9 (both)",
-        "image_size_bytes": 769460929,
-        "image_ids": "d3c7f79d9df2 vs 602cf10611ec (Podman layer-tar gzip non-determinism, known debt)"
+        "pip_freeze_md5": "a6a8985ae93cb0ae5bfbc36da7ad0cf9 (both; identical to phase-1 review round)",
+        "file_list_md5": "dca115fa79e5b76fc5539935c14c013e (both)",
+        "image_size_bytes": "771003453 vs 771003454 (1-byte Podman gzip non-determinism, known debt)",
+        "image_ids": "127a1439acb4 vs 413c5b0948b7 (digests b7c0d722... vs 3a5da59a... differ - Podman gzip, known debt)"
       },
       "build_logs": [
-        "%TEMP%/opencode/p1-002-review/build-review.log",
-        "%TEMP%/opencode/p1-002-review/build-review2.log",
-        "%TEMP%/opencode/p1-002-review/build-review-repro.log"
+        "%TEMP%/opencode/p1-002-phase2/build-phase2.log",
+        "%TEMP%/opencode/p1-002-phase2/build-phase2-repro.log"
       ]
     },
     "deviations": [
-      "validate-design checks split: the triaged PATCH 6 suggested one combined python3 -c import command; implemented as two separate checks (one command per check) so a failure names the failing package and check() keeps its single-pattern contract. Both do real imports and assert exact pinned versions — B-15/BAR-006 intent fully met.",
-      "sudoers loop single-line form: the triaged multi-line for...done block cannot span lines inside a backslash-continued RUN body (first build: '/bin/sh: syntax error expecting done'); collapsed to one shell line with identical semantics and an inline comment.",
-      "npm global wiring: npm install -g cannot consume a lockfile, so PATCH 2 is implemented as npm ci --ignore-scripts + copy into the global layout + explicit bin symlinks. Side effect: npm ls -g --depth=0 lists the whole 165-package locked tree instead of 4 top-level entries; all expected names present and CLIs verified.",
-      "npm exact-pinned (^10\\.9\\.8$): not listed in the triaged patch, but npm ships inside the SHA-256-pinned Node 22.23.2 tarball, so exact-pinning is deterministic and consistent with PATCH 5's intent."
+      "--no-cache-dir added to the pip download phase: Brahms' SEC-02 sketch omits it, but a builder-run pip download without it would bake the HTTP/wheel cache under /home/builder/.cache/pip, defeating AC8 (the same reason PIP_NO_CACHE_DIR was scoped out of the runtime ENV in patch-3).",
+      "Wheelhouse created by the builder itself (mkdir in the download RUN) instead of a root RUN + chown - one less root-owned intermediate path; builder-owned and cleaned up by the root install phase.",
+      "'cd /' placed at script startup (all checks), not just before the Python checks: also stops non-Python tools (e.g. markdownlint config discovery) from resolving files relative to the repository; the Python checks additionally carry -I.",
+      "/home/builder contents changed vs the phase-1 review image: with builder creation moved before npm, useradd --create-home now finds no pre-existing /home/builder, so the Debian skeleton (.bashrc/.profile/.bash_logout, mode 700 home) is present (3 files/4553 bytes vs the phase-1 round's 4/0). Deterministic across builds of this Containerfile; AC8 holds; phase-1 counts superseded."
     ],
     "known_issues": [
-      "npm audit: 8 vulnerabilities (4 moderate, 4 high) in the locked transitive npm tree (e.g. glob@11.0.3, which also emits a deprecation warning during npm ci). Tree is locked (cannot drift) but vulnerable versions remain until pin bumps + lock regeneration — P1-022 scope.",
-      "ci-architecture.md section candelamoon-docs 'Build-time network' still lists only 'PyPI, npm registry' while the Containerfile/handoff now document the 5-domain allowlist; update the normative spec doc in the same PR as the next pin change.",
-      "AC8 digest non-determinism unchanged (Podman layer-tar gzip); content reproducibility of the new locked build verified (identical file lists, counts, bytes, pip freeze, image size).",
-      "jsonschema __version__ DeprecationWarning on stderr (per the triaged patch's explicit command choice) — harmless, anchored pattern matches the version line, visible only in --verbose first-line output."
+      "AC8 digest non-determinism unchanged (Podman layer-tar gzip): content reproducibility verified (identical trees, pip freeze md5 a6a8985a..., file-list md5 dca115fa...); image size differs by 1 byte (771,003,453 vs 771,003,454) and digests differ - same known debt as P1-001/phase-1.",
+      "SEC-03..SEC-06 remain open at the image level by design - deferred-to-CI per Brahms: build-network egress enforcement, npm runtime sandboxing, runtime --network=none enforcement, apt snapshot pinning. Requirements for the CI job definition round and P1-005; image-side controls (wheel-only pip, --ignore-scripts, hash locks, non-root runtime user) are in place.",
+      "jsonschema __version__ DeprecationWarning on stderr (unchanged from phase 1) - harmless; visible only as the first line in --verbose output.",
+      "npm audit debt unchanged (8 vulnerabilities in the locked transitive npm tree) - P1-022 scope; tree locked, cannot drift.",
+      "1-byte image-size difference between the two phase2 builds (771,003,453 vs 771,003,454) - same Podman gzip non-determinism; content identical (file-list md5 equal)."
     ]
   },
   "emitted_at": "2026-08-09T23:40:00Z",
