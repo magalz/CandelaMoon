@@ -1,0 +1,53 @@
+# CandelaMoon docs image - pinned pip dependencies
+# ----------------------------------------------------------------------------
+# Per ci-architecture.md § "candelamoon-docs" § "Installed tools":
+#   "Python 3.11 + pinned pip deps (jsonschema, pyyaml, yamllint, link
+#    checker e.g. linkchecker or markdown-link-check)"
+# Per toolchain-pins.md § "Python 3.11" and the docs-validate job scope
+# (ci-architecture.md § "docs-validate"): these are the Python-side
+# dependencies the design validator entrypoint / usr/local/bin/validate-design
+# asserts at run time.
+#
+# Pinning policy: every direct dependency is pinned to an exact
+# Major.minor.patch. Transitive dependencies are resolved ONCE and
+# locked — with a --hash=sha256:... line per artifact — in the generated
+# `requirements.lock` (this file is the human-authored source of truth;
+# regenerate the lock with:
+#   uv pip compile --generate-hashes --python-version 3.11 \
+#     --python-platform x86_64-unknown-linux-gnu requirements.txt -o requirements.lock
+# or pip-compile --generate-hashes with the same constraints).
+# The Containerfile installs with
+# `pip install --require-hashes --no-deps -r requirements.lock`, so a
+# rebuild cannot silently pick up a changed transitive version; the
+# resolved tree is also recorded in toolchain-pins.md § "Python 3.11".
+#
+# Choice of link checker: we use the npm package `markdown-link-check`
+# (see Containerfile § "markdownlint-cli + markdown-link-check"), so
+# the link checker is NOT in this pip requirements file. The alternative
+# `linkchecker` (pip) is rejected for two reasons: (a) it carries many
+# additional Python deps (BeautifulSoup, requests, ...) that bloat the
+# slim image, and (b) `markdown-link-check` is purpose-built for
+# Markdown link validation and pairs naturally with markdownlint-cli on
+# the same npm toolchain.
+#
+# Bumping a pin: update the version here, the container image digest
+# changes, and toolchain-pins.md should be re-validated in the same PR.
+# ----------------------------------------------------------------------------
+
+# jsonschema: JSON Schema validation for the design validator (architecture
+# schemas, ADR register, capability matrix, evidence manifest per
+# ci-architecture.md § "docs-validate"). Pure-Python wheels available for
+# CPython 3.11; resolves rpds-py + attrs + jsonschema-specifications +
+# referencing transitively.
+jsonschema==4.23.0
+
+# pyyaml: YAML parsing for the design validator (ADR register, capability
+# matrix). Pure-Python wheels available for CPython 3.11; no transitive
+# dependencies.
+pyyaml==6.0.2
+
+# yamllint: YAML linting for the docs-validate job (per ci-architecture.md
+# § "docs-validate" output: link-check report, markdownlint report; YAML
+# linting rides alongside). Pure-Python; resolves pyyaml + pathspec
+# transitively.
+yamllint==1.37.1

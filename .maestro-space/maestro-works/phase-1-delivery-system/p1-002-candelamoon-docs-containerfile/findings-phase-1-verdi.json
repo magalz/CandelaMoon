@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "findings",
+  "agent": {
+    "name": "Verdi",
+    "role": "Acceptance Analyst",
+    "subagent_type": "verdi-acceptance-analyst",
+    "dispatched_by": "not provided"
+  },
+  "task": {
+    "change_id": "P1-002",
+    "phase": "Phase 1",
+    "phase_short": "phase-1-delivery-system",
+    "branch": "phase1/p1-002-candelamoon-docs-containerfile",
+    "base_sha": "86d3c216eb2539cec76556978cc7e36941dfaca8",
+    "head_sha": "e37c8c189b2505b11e36093c629fe6430839031f"
+  },
+  "data": {
+    "review_phase": 1,
+    "findings": [
+      {
+        "id": "A-01",
+        "title": "validate-design is only a tool-presence smoke test",
+        "severity": "high",
+        "detail": "The spec requires schema validation for architecture schemas, the ADR register, capability matrix, and evidence manifest, plus ADR/capability-matrix validation scripts. The delivered entrypoint only runs version/import-metadata checks and never reads /workspace/docs, validates a schema, or invokes a design-validation script. AC3 is therefore satisfied only at the pathname/tool-presence level.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/validate-design",
+          "line": 6,
+          "symbol": "validate-design"
+        },
+        "suggested_route": "patch",
+        "evidence": "ci-architecture.md:72 requires the validation behavior; validate-design:94-124 contains only executable checks for tool versions and package metadata."
+      },
+      {
+        "id": "A-02",
+        "title": "Build-time network is not limited to the AC5 allowlist",
+        "severity": "high",
+        "detail": "The build performs apt-get update/install, reaching Debian mirrors, and downloads Node.js from nodejs.org. Neither endpoint is in AC5's exact allowlist of pypi.org, files.pythonhosted.org, and registry.npmjs.org. Documentation of the extra endpoint does not enforce a network policy.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 117,
+          "symbol": "apt-get/curl build steps"
+        },
+        "suggested_route": "decision-needed",
+        "evidence": "A fresh podman build log showed deb.debian.org traffic during apt-get and curl https://nodejs.org/dist/... during the Node install; Containerfile:136-138 explicitly acknowledges nodejs.org as an added endpoint."
+      },
+      {
+        "id": "A-03",
+        "title": "Reproducibility is demonstrated only by coarse metrics, not by a locked image build",
+        "severity": "medium",
+        "detail": "Apt package versions, pip transitives, and npm transitives are resolved from mutable repositories at build time. Two no-cache builds matched pip freeze and file counts, but image sizes were 770379222 and 770379221 bytes and image digests differed (sha256:812c30e1... versus sha256:a4c8b8d5...). The narrow AC8 probes pass, but they do not prove stable image content or bit-reproducible rebuilds.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 117,
+          "symbol": "reproducibility and package-install steps"
+        },
+        "suggested_route": "patch",
+        "evidence": "podman image inspect reported different IDs, sizes, and digests for the two --no-cache builds; Containerfile:276-279 explicitly records non-reproducible image digests, while requirements.txt leaves transitive resolution to pip."
+      }
+    ]
+  },
+  "emitted_at": "2026-08-09T07:00:31Z",
+  "narrative_path": "findings-phase-1-verdi.md"
+}

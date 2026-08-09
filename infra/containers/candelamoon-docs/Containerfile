@@ -1,0 +1,409 @@
+# syntax=docker/dockerfile:1
+#
+# Containerfile: candelamoon-docs
+# ----------------------------------------------------------------------------
+# Role: docs validation environment for the CandelaMoon delivery pipeline.
+# Used by the docs-validate CI job (per-commit + per-PR), memtrace-sync
+# support, and the evidence audit (see ci-architecture.md § "Jobs" /
+# "Pipeline Tiers").
+#
+# This file is the second of four image roles defined in
+# ci-architecture.md § "Images" (after candelamoon-android from P1-001).
+# The pattern follows the P1-001 Containerfile: digest-pinned base,
+# non-root builder user (uid 1000), mtime normalization, inline doc
+# comments, and fail-closed every step.
+#
+# Governing docs (every RUN section links back to the doc that defines it):
+#   - ci-architecture.md § "candelamoon-docs" (image role definition,
+#     lines 69-76)
+#   - ci-architecture.md § "Common conventions" (non-root user, mounts,
+#     network; lines 53-58)
+#   - toolchain-pins.md § "Python 3.11" / "Node.js 22 LTS" /
+#     "Container Base Images"
+#   - ADR 0014 (Podman-First Execution: rootless, digest-pinned, same
+#     image locally and in CI)
+#
+# Build context: the repo root. .containerignore at the repo root excludes
+# .git/, .maestro-space/, build outputs, and other non-build artifacts.
+# This Containerfile COPYs four small files from the build context:
+#   - infra/containers/candelamoon-docs/requirements.lock (pip lock, hashed)
+#   - infra/containers/candelamoon-docs/package.json +
+#     package-lock.json (npm lock, integrity-hashed)
+#   - infra/containers/candelamoon-docs/validate-design (validator script)
+# Everything else is downloaded from the network at build time, so a
+# minimal .containerignore is sufficient (verified per AC9).
+#
+# Build-time network allowlist (AC5; documented inline at each install
+# step too):
+#   - pypi.org / files.pythonhosted.org  (pip install from the lock)
+#   - registry.npmjs.org                 (npm ci from package-lock.json)
+#   - nodejs.org                         (Node.js 22 LTS binary tarball)
+#   - deb.debian.org                     (apt-get update / install)
+# Run-time network is --network=none (ci-architecture.md §
+# "candelamoon-docs" § "Run-time network").
+# ----------------------------------------------------------------------------
+
+# --- Base image -----------------------------------------------------------
+# Digest-pinned Python 3.11 slim (Debian 13 "trixie"). The base ships a
+# non-interactive Python 3.11.15 interpreter and is the floor for
+# validator tooling (jsonschema, yamllint, pydantic) per toolchain-pins.md
+# "Python" § "Rationale".
+# Digest resolved on 2026-08-09 via:
+#   podman pull docker.io/library/python:3.11-slim
+#   podman image inspect --format '{{index .RepoDigests 0}}' ...
+# -> docker.io/library/python@sha256:78b39ef14d8e2b4d71f8dc304f1328c37df95fe0ef99477c2ae6bd3d03784553
+# Image ID 245f9d32fabaec22e749aa5cfef79996088135e9d4410f4e7ebe133c2be98132, created 2026-08-05.
+# In-image `python3 --version` reports `Python 3.11.15`; in-image
+# `cat /etc/os-release` reports `Debian GNU/Linux 13 (trixie)` /
+# `DEBIAN_VERSION_FULL 13.6`.
+# Recorded in toolchain-pins.md "Container Base Images" / "Python" sections.
+# Per toolchain-pins.md "Container Base Images" § "Resolution procedure".
+# Per ADR 0014 (digest-pinned bases give bit-reproducible images).
+FROM docker.io/library/python:3.11-slim@sha256:78b39ef14d8e2b4d71f8dc304f1328c37df95fe0ef99477c2ae6bd3d03784553
+
+# --- Reproducibility knobs ------------------------------------------------
+# Fixed epoch so the layer content is deterministic across rebuilds. Used
+# by the find/touch post-processing below. Per AC8 (reproducible builds).
+# 2025-01-01 00:00:00 UTC
+# PIP_DISABLE_PIP_VERSION_CHECK=1 / PYTHONDONTWRITEBYTECODE=1: keep the
+# pip build layer small and deterministic.
+# PIP_NO_CACHE_DIR is deliberately NOT set here: as an ENV it would
+# persist into the runtime image and disable the pip-cache volume
+# (/home/builder/.cache/pip) declared in ci-architecture.md "Common
+# conventions" § "Cache mounts" (B-11 / BAR-013). The build-only pip
+# install passes --no-cache-dir itself (see the pip section below);
+# runtime pip operations read/write the mounted cache.
+# PIP_ROOT_USER_ACTION=ignore: silences pip's "running as root" warning in
+# the build layer (we are root during the build; USER builder comes later).
+# NPM_CONFIG_UPDATE_NOTIFIER=false / NPM_CONFIG_FUND=false /
+# NPM_CONFIG_AUDIT=false: drop npm's network-dependent housekeeping
+# (update notifier, funding nag, audit). npm install still works.
+ENV SOURCE_DATE_EPOCH=1735689600 \
+    LC_ALL=C.UTF-8 \
+    LANG=C.UTF-8 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_ROOT_USER_ACTION=ignore \
+    PYTHONDONTWRITEBYTECODE=1 \
+    NPM_CONFIG_UPDATE_NOTIFIER=false \
+    NPM_CONFIG_FUND=false \
+    NPM_CONFIG_AUDIT=false
+
+# --- Standard locations ---------------------------------------------------
+# HOME: pinned to the builder home so shell tools that resolve ~ / $HOME
+# (pip's default cache, npm's default cache) always land on the baked
+# files regardless of the OCI launcher.
+ENV HOME=/home/builder
+
+# --- Pinned tool versions (single source of truth) -----------------------
+# Per ci-architecture.md § "candelamoon-docs" and toolchain-pins.md
+# § "Node.js 22 LTS" / "Python 3.11". These constants drive the Node.js
+# tarball download below; bumping NODE_VERSION requires updating
+# toolchain-pins.md and the sha256 line in lockstep.
+#   NODE_VERSION 22.23.2: latest 22.x LTS security release (LTS line "Jod"),
+#     published 2026-07-28; recorded in toolchain-pins.md § "Node.js 22 LTS".
+#   NODE_SHA256_LINUX_X64: from https://nodejs.org/dist/v22.23.2/SHASUMS256.txt.
+#   markdownlint-cli@0.45.0 / markdown-link-check@3.13.7: pinned in the
+#     adjacent package.json and locked (full transitive tree + integrity
+#     hashes) in package-lock.json — see the npm section below. Bumping
+#     either requires regenerating the lock and updating
+#     toolchain-pins.md § "Node" in the same change.
+ENV NODE_VERSION=22.23.2 \
+    NODE_SHA256_LINUX_X64=d60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307
+
+# --- OS-level helpers -----------------------------------------------------
+# ca-certificates: TLS verification for nodejs.org, pypi.org, files.pythonhosted.org.
+# curl: pull the Node.js distribution tarball from nodejs.org.
+# git: needed by evidence-audit / memtrace-sync for repo metadata and by
+# developers who shell into the container.
+# xz-utils: the official Node.js tarball is .tar.xz.
+# The apt cache is purged in the same RUN so this layer is deterministic.
+# DEBIAN_FRONTEND=noninteractive: no package-configuration prompts in a
+# non-interactive build. Acquire::Retries=3: transient mirror/network
+# failures retry instead of aborting the build.
+# APT inputs are versioned implicitly by the base image digest: the
+# python:3.11-slim base pins its own apt sources and package revisions,
+# so the installed package set cannot drift for a pinned base. Full apt
+# snapshotting (e.g. a snapshot-pinning apt proxy) is a deferred follow-up
+# (mirrors P1-001 BER-002).
+RUN DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 update \
+    && DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Node.js 22 LTS (the major pin, concrete patch via SHA-256) ----------
+# Per toolchain-pins.md § "Node.js 22 LTS": the spec pins "22 LTS" (major).
+# The concrete patch (22.23.2) is fixed by the SHA-256-pinned tarball
+# below; bumping to a newer 22.x.y is a deliberate, reviewable change
+# (update the SHA-256 from https://nodejs.org/dist/v<version>/SHASUMS256.txt
+# and update toolchain-pins.md § "Node.js 22 LTS" in the same PR).
+# The tarball is downloaded with curl, verified with sha256sum, and
+# extracted into /opt/node so the binary is at /opt/node/bin/node and
+# /opt/node/bin/npm (mirroring the official binary install layout).
+# The package integrity check (BER-001, B-03) is enforced via sha256sum -c
+# before extraction.
+# Build-time network endpoint: nodejs.org (added to the spec's
+# pypi.org / registry.npmjs.org allowlist at AC5 by necessity — the
+# Node.js binary distribution lives there, not on the npm registry).
+RUN set -eux; \
+    curl -fsSLO "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz"; \
+    echo "${NODE_SHA256_LINUX_X64}  node-v${NODE_VERSION}-linux-x64.tar.xz" | sha256sum -c -; \
+    mkdir -p /opt/node; \
+    tar -xJf "node-v${NODE_VERSION}-linux-x64.tar.xz" -C /opt/node --strip-components=1; \
+    rm "node-v${NODE_VERSION}-linux-x64.tar.xz"
+
+# Put Node.js + npm on PATH for the remaining RUNs (so `npm`, `node`,
+# and `npx` work directly) and for the final USER builder layer.
+ENV PATH=/opt/node/bin:${PATH}
+
+# --- Non-root builder user (uid/gid 1000) ---------------------------------
+# Per ci-architecture.md "Common conventions (applied to every image)":
+# "user `builder`, uid/gid 1000; `USER builder` as the final directive in
+# every Containerfile. All cache/output mounts are `chown builder:builder`
+# at creation." This matches the host's runner user so `--userns=keep-id`
+# (rootless Podman) gives 1:1 UID mapping on Linux runners, and matches
+# the same uid/gid as the candelamoon-android image (P1-001) so the
+# pip-cache and npm-cache volumes can be shared safely across images.
+#
+# The python:3.11-slim base does NOT ship a pre-existing uid-1000 user
+# (verified: `getent passwd 1000` returns nothing;
+# `getent passwd builder` returns nothing). We create the account from
+# scratch with the exact contract uid/gid 1000, which is simpler than
+# P1-001's rename-the-base-user logic (P1-001's eclipse-temurin base
+# ships an `ubuntu` user with uid 1000; this base ships nothing).
+#
+# Created BEFORE the pip section (SEC-02): pip's network retrieval must
+# run as builder, never as root, so the account must exist first.
+#
+# Every postcondition below is asserted, not assumed (BER-010): a
+# base-image change that breaks the contract fails the build loudly
+# instead of silently mis-mapping permissions. No `su`/PAM dependency:
+# ownership and identity are validated with `id`, which cannot lie about
+# the real identity (B-08, B-09).
+RUN set -eux; \
+    groupadd --gid 1000 --system builder; \
+    useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash --no-log-init builder; \
+    # Lock the password: builder is a service account — no password-based
+    # or interactive login (STR-08).
+    usermod --lock builder; \
+    # Replace the supplementary-group list with exactly "builder" so no
+    # inherited membership (adm, sudo, video, ...) survives (B-10, STR-08).
+    usermod -G builder builder; \
+    # Postcondition: uid/gid 1000 contract holds (BER-010).
+    [ "$(id -u builder)" = "1000" ] || { echo "ERROR: builder uid is $(id -u builder), expected 1000" >&2; exit 1; }; \
+    [ "$(id -g builder)" = "1000" ] || { echo "ERROR: builder gid is $(id -g builder), expected 1000" >&2; exit 1; }; \
+    [ "$(id -G builder)" = "1000" ] || { echo "ERROR: builder retains supplementary groups: $(id -G builder)" >&2; exit 1; }; \
+    # Fail closed if a sudoers rule names builder or %builder. Each path
+    # is tested explicitly (BAR-009): the previous `! grep -rq ... || ...`
+    # negated grep status 2 (missing/unreadable path) into success and
+    # skipped the error branch, so an absent /etc/sudoers.d/ silently
+    # proved nothing. Globs that match nothing stay literal and are
+    # skipped by the `[ -f ] || continue` guard; only existing regular
+    # files are grepped. (Single-line form: the RUN body is one
+    # backslash-continued shell line, so the loop cannot span lines.)
+    for f in /etc/sudoers /etc/sudoers.d/*; do [ -f "$f" ] || continue; if grep -q '^builder\b\|^%builder\b' "$f"; then echo "ERROR: builder has sudoers entries in $f" >&2; exit 1; fi; done; \
+    # Home must exist and be owned by builder (uid 1000); pip / npm
+    # runtimes resolve ~ to /home/builder and write to .cache/pip and .npm
+    # under it (B-09, BER-011).
+    mkdir -p /home/builder; \
+    chown -R builder:builder /home/builder; \
+    [ "$(stat -c %u /home/builder)" = "1000" ] \
+        || { echo "ERROR: /home/builder owner is $(stat -c %u /home/builder), expected 1000" >&2; exit 1; }
+
+# --- Python pip dependencies ----------------------------------------------
+# Per ci-architecture.md § "candelamoon-docs" § "Installed tools":
+#   "Python 3.11 + pinned pip deps (jsonschema, pyyaml, yamllint, link
+#    checker e.g. linkchecker or markdown-link-check)"
+# requirements.txt holds the three direct pins (the human-authored source
+# of truth); requirements.lock is the generated full-resolution lock with
+# a --hash=sha256:... line per artifact (regenerate with
+# `uv pip compile --generate-hashes --python-version 3.11
+#  --python-platform x86_64-unknown-linux-gnu requirements.txt -o
+#  requirements.lock`; the resolved tree is also recorded in
+# toolchain-pins.md § "Python").
+# The install is deterministic, integrity-verified, AND wheel-only
+# (SEC-02):
+#   --require-hashes: every downloaded artifact must match a recorded
+#     SHA-256 — a changed, yanked, or mirror-served wheel fails the build.
+#   --only-binary=:all: (BOTH commands): only prebuilt wheels are ever
+#     accepted. A source distribution (sdist) cannot satisfy the
+#     constraint, so pip can NEVER execute setup.py / a PEP 517 build
+#     backend — which would otherwise run as UID 0 before USER builder
+#     and give a malicious sdist root execution during the build
+#     (SEC-02).
+#   --no-deps: the lock already contains the complete transitive tree
+#     (attrs, jsonschema-specifications, pathspec, referencing, rpds-py,
+#     typing-extensions), so nothing is resolved against live PyPI
+#     metadata at build time.
+#   --no-cache-dir (BOTH commands): build-only, keeps the pip layer
+#     small and the image free of pip-cache content (which would vary
+#     between builds and defeat AC8). The runtime pip cache lives in the
+#     pip-cache volume mounted at /home/builder/.cache/pip per
+#     ci-architecture.md "Common conventions" § "Cache mounts"
+#     (B-11 / BAR-013) — PIP_NO_CACHE_DIR is intentionally NOT exported
+#     as an ENV (see the ENV block above).
+#
+# Root/builder split (SEC-02): all NETWORK retrieval runs as builder
+# (uid 1000), while the final INSTALL runs as root. A compromised or
+# malicious package parse can therefore never execute with build-time
+# root privileges; root only extracts the already-staged, hash-verified,
+# wheel-only artifacts into the image prefix (/usr/local). If a future
+# lock change yields no wheel for this platform, the download fails the
+# build (fail-closed) instead of silently falling back to an sdist.
+#
+# requirements.lock is COPY'd from the build context (the repo root) with
+# --chown=builder:builder so the unprivileged download phase can read it.
+# A dep bump lands in a separate image layer and re-keys the cache
+# automatically. Bump procedure: edit requirements.txt, regenerate the
+# lock, and update toolchain-pins.md § "Python" in the same change.
+# Build-time network endpoint: pypi.org / files.pythonhosted.org.
+COPY --chown=builder:builder infra/containers/candelamoon-docs/requirements.lock /tmp/requirements.lock
+
+# Download phase (network, unprivileged): stage hash-verified wheels as
+# builder into a builder-owned wheelhouse. `pip download` under
+# --only-binary=:all: refuses sdists outright, so no package build code
+# executes here; the wheelhouse is then asserted to contain ONLY .whl
+# files (non-empty, no strays) before root ever touches it.
+USER builder
+RUN set -eux; \
+    mkdir -p /tmp/pip-wheelhouse; \
+    python3 -m pip download --no-cache-dir --require-hashes --no-deps \
+        --only-binary=:all: -r /tmp/requirements.lock \
+        -d /tmp/pip-wheelhouse; \
+    [ "$(find /tmp/pip-wheelhouse -type f -name '*.whl' | wc -l)" -ge 1 ] \
+        || { echo "ERROR: pip wheelhouse is empty (no wheels downloaded)" >&2; exit 1; }; \
+    [ "$(find /tmp/pip-wheelhouse -type f | wc -l)" \
+        -eq "$(find /tmp/pip-wheelhouse -type f -name '*.whl' | wc -l)" ] \
+        || { echo "ERROR: pip wheelhouse contains non-.whl artifacts" >&2; exit 1; }
+
+# Install phase (offline, privileged): install the staged, verified
+# wheels only. --no-index + --find-links=/tmp/pip-wheelhouse means pip
+# can only see local wheels — no network, no live resolution; the
+# --only-binary=:all: and --require-hashes constraints stay on so a
+# future lock change fails closed here too. Cleanup removes both the
+# wheelhouse and the lock so neither leaks into the image.
+USER root
+RUN set -eux; \
+    python3 -m pip install --no-cache-dir --require-hashes --no-deps \
+        --only-binary=:all: --no-index \
+        --find-links=/tmp/pip-wheelhouse \
+        -r /tmp/requirements.lock; \
+    rm -rf /tmp/pip-wheelhouse /tmp/requirements.lock
+
+# --- markdownlint-cli + markdown-link-check (npm) -------------------------
+# Per ci-architecture.md § "candelamoon-docs" § "Installed tools":
+#   "Node.js 22 LTS + markdownlint-cli; design validator entrypoint
+#    (validate-design ...)"
+# The two top-level packages are pinned by exact version in package.json;
+# the full transitive tree (with per-package integrity hashes) is locked
+# in package-lock.json (lockfileVersion 3, generated with
+# `npm install --package-lock-only`; regenerate with npm >= 10).
+# `npm ci --ignore-scripts` installs EXACTLY the locked tree — no live
+# semver resolution, integrity-verified via the lock's `integrity`
+# hashes, and no lifecycle scripts executed as root (BAR-005). The
+# resulting node_modules is then wired into the global layout that
+# `npm install -g` would have produced: packages under
+# /opt/node/lib/node_modules and bin symlinks in /opt/node/bin
+# (markdownlint-cli 0.45.0 declares a single `markdownlint` bin;
+# markdown-link-check 3.13.7 declares `markdown-link-check`).
+# `npm cache clean --force` removes the cache the install would
+# otherwise leave behind. The npm run-time ALSO writes a `_logs/`
+# directory under $HOME/.npm/ with timestamped debug-log files whose
+# CONTENT varies between rebuilds (different timestamps, durations,
+# etc.) — those files would defeat AC8 reproducibility even though their
+# mtimes are normalized below, so we delete them after install. The
+# build-time network endpoint is registry.npmjs.org.
+COPY infra/containers/candelamoon-docs/package.json \
+     infra/containers/candelamoon-docs/package-lock.json \
+     /tmp/candelamoon-docs-npm/
+RUN set -eux; \
+    cd /tmp/candelamoon-docs-npm; \
+    npm ci --ignore-scripts; \
+    mkdir -p /opt/node/lib/node_modules; \
+    cp -a node_modules/. /opt/node/lib/node_modules/; \
+    ln -s ../lib/node_modules/markdownlint-cli/markdownlint.js /opt/node/bin/markdownlint; \
+    ln -s ../lib/node_modules/markdown-link-check/markdown-link-check /opt/node/bin/markdown-link-check; \
+    cd /; \
+    rm -rf /tmp/candelamoon-docs-npm; \
+    npm cache clean --force; \
+    rm -rf /home/builder/.npm/_logs /home/builder/.npm/_cacache
+
+# --- Design validator entrypoint (MVP) ------------------------------------
+# Per ci-architecture.md § "candelamoon-docs" § "Installed tools":
+#   "design validator entrypoint (validate-design - schema validation of
+#    architecture schemas, ADR register, capability matrix, evidence
+#    manifest); ADR/capability-matrix validation scripts."
+# MVP scope (P1-002): the script asserts that every required tool is
+# installed and runnable. Real validation logic against docs/ content
+# (architecture schemas, ADR register, capability matrix, evidence
+# manifest) is a P1-017 follow-up. The script is COPY'd from the build
+# context and installed to /usr/local/bin/ so it's on the default PATH
+# for both root (during the build) and builder (at run time).
+COPY infra/containers/candelamoon-docs/validate-design /usr/local/bin/validate-design
+RUN chmod 0755 /usr/local/bin/validate-design
+
+# --- Runtime cache directories (chown'd to builder) ------------------------
+# Per ci-architecture.md "Common conventions" § "Cache mounts":
+# `pip-cache:/home/builder/.cache/pip`, `npm-cache:/home/builder/.npm`.
+# These directories are baked into the image as empty, builder-owned
+# placeholders so a first run with no cache volume still works (the
+# volume mount on top is then writable by builder, with --userns=keep-id
+# preserving ownership for the host's runner user).
+# /home/builder/.npm/_cacache (npm's own internal cache) is created on
+# demand by the first `npm install`, but we pre-create the parent for
+# the same reason.
+RUN mkdir -p /home/builder/.cache/pip /home/builder/.npm \
+    && chown -R builder:builder /home/builder
+
+# --- Create /workspace before dropping privileges -------------------------
+# Per ci-architecture.md "Common conventions" § "Source mount": the repo
+# is bind-mounted at /workspace at run time. Create and own the
+# directory while still root: the unprivileged builder user cannot
+# create it under / (BER-011). `WORKDIR` below then never fails, with
+# or without the bind mount (e.g. ad-hoc `podman run` invocations).
+# Created BEFORE the mtime-normalization pass below so /workspace's own
+# directory mtime is normalized to SOURCE_DATE_EPOCH too (B-12 / BAR-010).
+RUN mkdir -p /workspace && chown builder:builder /workspace
+
+# --- Normalize file mtimes to SOURCE_DATE_EPOCH for reproducibility --------
+# pip, npm, and the Node.js tarball extraction set mtimes to "now" when
+# writing files. For reproducible image content across rebuilds (AC8),
+# retouch every file and directory we wrote, regardless of its original
+# timestamp. We skip /usr (the base image's Python install) since it's
+# already deterministic for a given base digest. /workspace is included:
+# it is created (and chowned) just above, before this pass (B-12 /
+# BAR-010). No `-newer /etc/hostname` filter — that marker is
+# engine-managed and unstable, so it cannot anchor a reproducibility
+# check (BER-012). No error suppression: if touch fails, the build
+# fails, which signals a real problem rather than silently shipping
+# non-reproducible layers (BER-013, B-20).
+# Note: image DIGEST is not bit-reproducible because Podman's layer-tar
+# gzip is non-deterministic (known debt from P1-001 AC8). Two --no-cache
+# builds produce identical file counts and total bytes under /opt, /usr,
+# /home/builder, and /workspace; only the gzip wrapper bytes differ.
+RUN find /opt/node /usr/local /home/builder /workspace \
+        -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +
+
+# --- Final runtime configuration ------------------------------------------
+# USER builder is the last USER directive per ci-architecture.md "Common
+# conventions". (Earlier in the file there are temporary USER switches in
+# the pip section — SEC-02: builder for the network download, root for
+# the offline wheel install — but from this point on, all RUN/CMD/
+# ENTRYPOINT run as the unprivileged builder user.)
+USER builder
+
+# WORKDIR is /workspace per ci-architecture.md "Common conventions"
+# § "Source mount": the repo is bind-mounted at /workspace at run time.
+# The directory was created (and chown'd to builder) before `USER
+# builder` above.
+WORKDIR /workspace
+
+# Default command: run the design validator (MVP tool-presence check).
+# `podman run --rm --network=none <image>` now validates by default
+# instead of dropping into bash and exiting 0 without validating
+# anything (B-17). CI workflows can still pass an explicit command;
+# for interactive inspection override with `--entrypoint bash`, e.g.
+# `podman run --rm -it --entrypoint bash candelamoon-docs:review`.
+CMD ["validate-design"]

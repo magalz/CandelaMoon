@@ -118,10 +118,13 @@ NDK ships its own clang. Pin the NDK clang version.
 Pin Node.js LTS for candelamoon-docs and candelamoon-security containers.
 
 - **Tool**: Node.js (JavaScript runtime for docs linting and security scanners)
-- **Exact version**: 22 LTS (pin the concrete `22.x.y` at Phase 1; 22 is Active LTS in 2026)
+- **Exact version**: 22 LTS (pin the concrete `22.x.y` at Phase 1; 22 is Active LTS in 2026). **Resolved 2026-08-09 to `22.23.2`** (latest 22.x LTS security release, published 2026-07-28, from the "Jod" LTS line).
 - **Source URL**: https://nodejs.org/en/download (official tarballs; install from `node-v22.x.y-linux-x64.tar.xz`)
-- **Digest/SHA**: `<TBD>` — record the official `SHASUMS256.txt` entry at Phase 1.
-- **Where used**: `candelamoon-docs` (markdownlint-cli, link-check tooling, JSON Schema tooling), `candelamoon-security` (npm-based scanners: `npm audit`, gitleaks via npm distribution, semgrep engine dependencies).
+- **Digest/SHA**: `node-v22.23.2-linux-x64.tar.xz` SHA-256 = `d60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307` (from `https://nodejs.org/dist/v22.23.2/SHASUMS256.txt`; verified by `sha256sum -c` in the Containerfile at build time). To bump Node 22.x.y: download the new `SHASUMS256.txt` entry and update this line plus the `NODE_VERSION` / `NODE_SHA256_LINUX_X64` ENV lines in `infra/containers/candelamoon-docs/Containerfile` in lockstep.
+- **Where used**: `candelamoon-docs` (markdownlint-cli, markdown-link-check), `candelamoon-security` (npm-based scanners: `npm audit`, gitleaks via npm distribution, semgrep engine dependencies).
+- **candelamoon-docs npm pins** (resolved 2026-08-09; **transitive tree lock-locked 2026-08-09** in `infra/containers/candelamoon-docs/package-lock.json`, lockfileVersion 3, generated with `npm install --package-lock-only`; the Containerfile installs the exact locked tree with `npm ci --ignore-scripts` and wires the global layout under `/opt/node`):
+  - `markdownlint-cli@0.45.0` (registry.npmjs.org; single bin `markdownlint`)
+  - `markdown-link-check@3.13.7` (registry.npmjs.org; chosen over the pip alternative `linkchecker` to keep the link checker on the same npm toolchain as markdownlint-cli and avoid `linkchecker`'s additional Python deps)
 - **Rationale**: LTS-only policy keeps both images on one supported major; Node 22 is the longest-supported current LTS line and matches the tooling used by the docs/security images. Never float to `latest`.
 
 ## Python
@@ -131,8 +134,14 @@ Pin Python 3.11+ for design validator and contract fixtures.
 - **Tool**: CPython
 - **Exact version**: 3.11.x (min 3.11; pin concrete patch via `python:3.11-slim` digest)
 - **Source URL**: https://www.python.org/downloads/ ; base image `docker.io/library/python:3.11-slim`
-- **Digest/SHA**: via base-image digest (see Container Base Images section)
+- **Digest/SHA**: `@sha256:78b39ef14d8e2b4d71f8dc304f1328c37df95fe0ef99477c2ae6bd3d03784553` for the `candelamoon-docs` image; same digest applies to `luminal-contract` because both images use the same base. (See Container Base Images section for resolution details.)
 - **Where used**: `candelamoon-docs` (design validator: architecture schema, ADR, capability-matrix, evidence validation; link/format checks), `luminal-contract` (protocol fixtures, host-response simulation, parser validation). Both images install pinned pip dependencies from `requirements-*.txt`/lockfiles at build time.
+- **candelamoon-docs pip pins** (resolved 2026-08-09 by `podman build` against the pinned base; **hash-locked 2026-08-09** in `infra/containers/candelamoon-docs/requirements.lock`, regenerated with `uv pip compile --generate-hashes --python-version 3.11 --python-platform x86_64-unknown-linux-gnu requirements.txt`):
+  - `jsonschema==4.23.0` (transitive: `attrs==26.1.0`, `jsonschema-specifications==2025.9.1`, `referencing==0.37.0`, `rpds-py==2026.6.3`, `typing-extensions==4.16.0`)
+  - `pyyaml==6.0.2` (no transitive deps)
+  - `yamllint==1.37.1` (transitive: `pathspec==1.1.1`)
+  - `packaging==26.3` (pre-installed in the `python:3.11-slim` base image itself — not part of the lock; appears in `pip freeze` because it ships with the base's setuptools)
+  - The Containerfile installs with `pip install --require-hashes --no-deps -r requirements.lock` (B-06/BAR-003/BAR-004 fix): every artifact's SHA-256 is verified and no live PyPI resolution happens at build time.
 - **Rationale**: 3.11 is the floor because validator tooling (jsonschema, yamllint, pydantic-based schema checks) targets 3.11+; python:3.11-slim keeps both images small and guarantees the same interpreter on host and CI for fixture generation.
 
 ## GitHub Actions
@@ -165,7 +174,7 @@ Pin base image digests for: candelamoon-android (eclipse-temurin:17-jdk), candel
 | Image role | Base image | Registry reference | Digest pin (resolve at Phase 1) |
 |---|---|---|---|
 | `candelamoon-android` | Eclipse Temurin 17 JDK | `docker.io/eclipse-temurin:17-jdk` | `@sha256:23441a35a47dca0fdd77b1b406adc1f86f29d042033ca9fece736a2633f8ba43` (resolved 2026-08-08; image ID `9da03b73ed12ca502e28ddd65a4d60302f084c484f0235f523808f796c0f7947`, created 2026-08-04 01:27:24 UTC) |
-| `candelamoon-docs` | Python 3.11 slim | `docker.io/library/python:3.11-slim` | `@sha256:<DIGEST docs>` |
+| `candelamoon-docs` | Python 3.11 slim | `docker.io/library/python:3.11-slim` | `@sha256:78b39ef14d8e2b4d71f8dc304f1328c37df95fe0ef99477c2ae6bd3d03784553` (resolved 2026-08-09; image ID `245f9d32fabaec22e749aa5cfef79996088135e9d4410f4e7ebe133c2be98132`, created 2026-08-05 01:12:29 UTC; in-image `python3 --version` reports `Python 3.11.15`; in-image `cat /etc/os-release` reports `Debian GNU/Linux 13 (trixie)` / `DEBIAN_VERSION_FULL 13.6`) |
 | `candelamoon-security` | TBD Phase 1 (candidate: python:3.11-slim + distroless/static scanner binaries) | TBD | `@sha256:<DIGEST security>` |
 | `luminal-contract` | Python 3.11 slim | `docker.io/library/python:3.11-slim` | `@sha256:<DIGEST luminal>` |
 

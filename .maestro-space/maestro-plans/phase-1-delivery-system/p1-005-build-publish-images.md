@@ -2,7 +2,7 @@
 
 **Phase**: Phase 1
 **Status**: Pending
-**Dependencies**: none
+**Dependencies**: P1-001..P1-004, P1-022
 **Complexity**: M
 **Related ADRs**: 0014
 

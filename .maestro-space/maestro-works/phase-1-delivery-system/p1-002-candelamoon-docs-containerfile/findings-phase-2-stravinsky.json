@@ -1,0 +1,136 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "findings",
+  "agent": {
+    "name": "Stravinsky",
+    "role": "Offensive security reviewer using STRIDE and OWASP methodology",
+    "subagent_type": "stravinsky-red-team-analyst"
+  },
+  "task": {
+    "change_id": "P1-002",
+    "phase": "Phase 2",
+    "phase_short": "phase-1-delivery-system",
+    "branch": "phase1/p1-002-candelamoon-docs-containerfile",
+    "base_sha": "86d3c216eb2539cec76556978cc7e36941dfaca8",
+    "head_sha": "0c80776971c86ddbfe60232cdfe9cdb4ebd42331"
+  },
+  "data": {
+    "review_phase": 2,
+    "findings": [
+      {
+        "id": "SEC-01",
+        "title": "Workspace files hijack the Python version checks",
+        "severity": "high",
+        "detail": "validate-design runs python3 -c while WORKDIR is the bind-mounted /workspace. Python searches the current directory before site-packages for -c execution, so repository files named jsonschema.py or yaml.py replace the installed packages. Import-time code executes and can report the expected __version__, making the check green while running attacker code.",
+        "attack_scenario": "An attacker adds jsonschema.py at the repository root in a pull request. CI mounts the checkout at /workspace and starts validate-design. The import executes attacker code as builder, which reads the checkout and container-visible credentials, modifies writable workspace files, and sets __version__ to 4.23.0 so validation succeeds. yaml.py provides the same path for the second check.",
+        "exploitability": "Remote authenticated/untrusted-PR attacker; automatic CI run; no physical access. Impact is bounded by the container's builder privileges and actual network isolation, but the checkout, cache mounts, and builder-readable environment remain available.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/validate-design",
+          "line": 126,
+          "symbol": "check python module version"
+        },
+        "suggested_route": "patch",
+        "evidence": "Containerfile:311-350 sets /workspace as WORKDIR and bind-mount target; validate-design:126-127 imports unqualified jsonschema and yaml modules.",
+        "categories": ["Tampering", "Elevation of Privilege", "CWE-427"]
+      },
+      {
+        "id": "SEC-02",
+        "title": "Pip can execute an untrusted distribution as root while building the image",
+        "severity": "critical",
+        "detail": "The dependency install occurs before USER builder and does not require wheels. A hash-locked source distribution can execute setup.py or a PEP 517 build backend and install hooks as UID 0. Hash verification authenticates selected bytes, not package intent, and --no-deps does not disable build-backend execution.",
+        "attack_scenario": "A dependency maintainer, compromised package account, or compromised dependency-update process introduces a malicious source distribution and its hash into the reviewed lock. A routine rebuild runs pip install as root; the build hook writes a backdoor into /usr/local or /opt, alters the validator, and captures build credentials or artifacts. Every consumer of the resulting image then executes the poisoned toolchain.",
+        "exploitability": "Remote supply-chain attacker or attacker able to land an approved lock refresh; automated image build triggers it; no physical access. The code runs with build-time root privileges and can affect the published image, while host escape still depends on the builder.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 192,
+          "symbol": "pip install"
+        },
+        "suggested_route": "patch",
+        "evidence": "PIP_ROOT_USER_ACTION=ignore at Containerfile:76-77 documents root installation; USER builder is not set until line 344; the install has no binary-only constraint.",
+        "categories": ["Tampering", "Elevation of Privilege", "Supply Chain", "CWE-829"]
+      },
+      {
+        "id": "SEC-03",
+        "title": "The build-time network allowlist is documentation only",
+        "severity": "high",
+        "detail": "The file lists an endpoint allowlist, but no RUN instruction or image-level mechanism constrains build egress. Package build code executes inside ordinary network-capable build steps and can connect outside PyPI, npm, Debian, or nodejs.org. Runtime --network=none does not protect the build phase.",
+        "attack_scenario": "During a rebuild, malicious Python build-backend code from the locked dependency set opens a connection to 169.254.169.254, a private 10.0.0.0/8 service, or an attacker-controlled collector. It probes internal services and sends build environment data while the build has network access, then leaves a payload in the generated image.",
+        "exploitability": "Remote supply-chain attacker plus an automated build on a runner with unrestricted egress; no physical access. Exploitation fails only if an external builder firewall independently supplies the missing restriction.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 36,
+          "symbol": "build-time network allowlist comments"
+        },
+        "suggested_route": "patch",
+        "evidence": "The allowlist appears only in comments at Containerfile:36-43; pip runs in an ordinary RUN at lines 191-192.",
+        "categories": ["Information Disclosure", "Denial of Service", "Lateral Movement", "CWE-918"]
+      },
+      {
+        "id": "SEC-04",
+        "title": "npm ci --ignore-scripts does not sandbox runtime dependency code",
+        "severity": "high",
+        "detail": "--ignore-scripts suppresses npm lifecycle hooks during installation, but the complete third-party tree is exposed as executable global CLI tools. Running a CLI or its version path loads JavaScript from the package and transitive dependencies. Lock integrity proves release bytes, not that a release is benign.",
+        "attack_scenario": "An attacker compromises an npm maintainer account or gets a backdoored dependency accepted in a lock refresh. The build succeeds because install hooks are ignored. On the next CI run, validate-design executes markdownlint --version and markdown-link-check --version, or the docs job runs those CLIs over the checkout. Malicious module code runs as builder, reads /workspace and CI environment data, alters reports, and exfiltrates data when runtime networking is available.",
+        "exploitability": "Remote supply-chain attacker; ordinary CI startup or docs validation supplies the trigger; no physical access. The process is non-root but can access builder-readable files, environment data, and the mounted workspace.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 223,
+          "symbol": "npm ci --ignore-scripts"
+        },
+        "suggested_route": "patch",
+        "evidence": "package.json:7-8 selects the CLIs; package-lock.json:1049-1067 and :1101-1124 define executable entries; validate-design:135-136 invokes them.",
+        "categories": ["Information Disclosure", "Tampering", "Supply Chain", "CWE-1357"]
+      },
+      {
+        "id": "SEC-05",
+        "title": "Runtime network isolation is not enforced, enabling link-checker SSRF",
+        "severity": "high",
+        "detail": "The image contains a network-capable Markdown link checker and proxy/HTTP stack, but --network=none exists only in comments and an example invocation. A caller that omits the flag gives the checker normal network access. Repository-controlled Markdown links then become an SSRF and internal-network request primitive.",
+        "attack_scenario": "An attacker adds a Markdown link to http://169.254.169.254/latest/meta-data/ or http://127.0.0.1:2375/containers/json. A networked docs-validate job invokes markdown-link-check; it fetches the attacker-selected endpoint and can follow an attacker-controlled redirect, probing or triggering internal services and exposing response-derived status or data through the validation report.",
+        "exploitability": "Remote authenticated/untrusted-PR attacker with automatic CI execution, provided the job or developer grants network access; no physical access. The image provides no enforcement when the launcher is misconfigured.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 353,
+          "symbol": "runtime network example"
+        },
+        "suggested_route": "patch",
+        "evidence": "package-lock.json:828-839 includes link-check and :1884-1897 includes proxy-capable clients; Containerfile:353-354 presents --network=none as caller convention.",
+        "categories": ["Spoofing", "Information Disclosure", "Lateral Movement", "CWE-918"]
+      },
+      {
+        "id": "SEC-06",
+        "title": "Unversioned apt packages drift into a privileged build and runtime image",
+        "severity": "medium",
+        "detail": "The base image is digest-pinned, but ca-certificates, curl, git, and xz-utils are selected from the live Debian repository with no package version or snapshot pin. A later rebuild can silently consume a newly compromised or vulnerable signed package.",
+        "attack_scenario": "An upstream Debian package or signing/repository supply chain is compromised and publishes a malicious xz-utils or curl update. A scheduled rebuild accepts the newest package, and the root build executes it while extracting Node or downloading dependencies. The package poisons /opt/node, the validator, or the published image without a source change in this repository.",
+        "exploitability": "Remote supply-chain attacker; requires control of an upstream signed distribution path and a subsequent automated rebuild; no physical access. Normal repository signature checking does not address malicious code shipped in a trusted release.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 128,
+          "symbol": "apt-get update/install"
+        },
+        "suggested_route": "patch",
+        "evidence": "Unversioned package names are installed at Containerfile:128-134, while the comments at lines 123-127 treat the base digest as pinning the apt package set.",
+        "categories": ["Tampering", "Supply Chain", "CWE-829"]
+      },
+      {
+        "id": "SEC-07",
+        "title": "The default validator is a tool-presence check, not design validation",
+        "severity": "medium",
+        "detail": "The default command never opens /workspace/docs, schemas, ADRs, capability matrices, or evidence manifests. It returns success after checking tool versions only. If the CI result is used as the design-integrity gate, the named validator can be satisfied while governed design content is absent, malformed, or tampered with.",
+        "attack_scenario": "A pull-request author changes an architecture schema or removes required evidence. CI starts the image's default validate-design command; every installed tool reports its expected version, no design file is examined, and the command exits 0. The pipeline accepts or publishes tampered design material as if it passed validation.",
+        "exploitability": "Remote authenticated/untrusted-PR attacker; automatic CI is the only trigger; no physical access. Impact is conditional on this exit status being used as an authorization or release gate; the file labels the missing validation as a follow-up.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/validate-design",
+          "line": 9,
+          "symbol": "MVP scope and version-only checks"
+        },
+        "suggested_route": "defer",
+        "evidence": "validate-design:9-14 explicitly states the placeholder scope; lines 101-136 perform only version checks and lines 138-144 emit unconditional success.",
+        "categories": ["Tampering", "Repudiation", "CWE-693"]
+      }
+    ]
+  },
+  "emitted_at": "2026-08-09T07:21:48Z",
+  "narrative_path": "findings-phase-2-stravinsky.md"
+}

@@ -1,0 +1,118 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "activity-report",
+  "agent": {
+    "name": "Bach (Senior Developer)",
+    "role": "Senior Developer — implements code per the task spec and TDD suite; applies review patches, verifies green, updates handoff and activity reports",
+    "subagent_type": "bach-senior-developer",
+    "dispatched_by": "Bernstein (orchestrator)",
+    "task_id": "P1-002"
+  },
+  "task": {
+    "change_id": "P1-002",
+    "phase": "Phase 1",
+    "phase_short": "phase-1-delivery-system",
+    "branch": "phase1/p1-002-candelamoon-docs-containerfile",
+    "base_sha": "0c80776971c86ddbfe60232cdfe9cdb4ebd42331",
+    "head_sha": "91bd8403ad75a8d8b410ca4c48a172549f382302",
+    "pr_url": ""
+  },
+  "data": {
+    "actions": [
+      "Read the handoff, agent identity file, activity-report template + agent-output.schema.json, both Phase 2 findings reports (findings-phase-2-stravinsky.md SEC-01..SEC-07, findings-phase-2-brahms.md dispositions), the P1-021 handoff (findings-array format precedent), and the current Containerfile / validate-design.",
+      "SEC-01 (validate-design): added 'cd /' at startup (after set -eu) so no check ever runs with the bind-mounted repository as its working directory; changed the jsonschema and pyyaml checks to 'python3 -I -c \"import ...; print(...__version__)\"' (isolated mode - CWD, PYTHONPATH, and user site-packages are NOT on sys.path); documented the isolation rule in the script header and at both checks, including the P1-017 requirement (image-path imports, explicit /workspace paths).",
+      "SEC-02 (Containerfile): moved the entire non-root builder-user section (groupadd/useradd/usermod --lock, supplementary-group reset, uid/gid asserts, sudoers loop, /home/builder contract) ABOVE the Python pip section; rewrote the pip section as a two-phase flow: COPY --chown=builder:builder of requirements.lock, USER builder 'python3 -m pip download --no-cache-dir --require-hashes --no-deps --only-binary=:all: -r /tmp/requirements.lock -d /tmp/pip-wheelhouse' with fail-closed wheelhouse assertions (non-empty, only .whl), USER root offline 'python3 -m pip install --no-cache-dir --require-hashes --no-deps --only-binary=:all: --no-index --find-links=/tmp/pip-wheelhouse -r /tmp/requirements.lock', then rm -rf the wheelhouse and lock. Extended the section comment with the root/builder split and wheel-only policy; updated the final-USER comment to document the temporary switches.",
+      "Built podman build --pull=never -t candelamoon-docs:phase2 -f infra/containers/candelamoon-docs/Containerfile . -> 23/23 steps green (20 -> 23: USER builder / USER root / COPY--chown layers).",
+      "Verified the full AC7 suite under --network=none, pip freeze vs the locked set, wheelhouse cleanup (/tmp clean in the image), /home/builder hygiene (3 skeleton files + empty .cache/.npm, no pip cache baked), negative paths (unknown arg / extra args -> exit 2), and default-CMD behavior.",
+      "SEC-01 proof: red-phase on the pre-fix image (candelamoon-docs:review) - /workspace/jsonschema.py with print('PWNED-JSONSCHEMA') + spoofed __version__ = '4.23.0' -> 'OK: jsonschema PWNED-JSONSCHEMA', exit 0 (attacker code executed AND false green). Green-phase on the new image: same hostile files (jsonschema.py + yaml.py) -> exit 0 with real modules, no PWNED output anywhere.",
+      "Reproducibility: second --no-cache build (phase2-repro) -> identical per-tree file counts/bytes, identical pip freeze md5 a6a8985a... (same as the phase-1 review round), identical full file-list md5 dca115fa..., Compare-Object clean; sizes 771,003,453 vs 771,003,454 bytes (1-byte Podman gzip non-determinism, known AC8 debt). Removed phase2-repro.",
+      "Committed the code changes (91bd8403), updated the handoff (head_sha, review_phase_1 findings arrays with file paths, review_phase_2 triage: 2 applied + 4 deferred-to-CI + 1 dismissed, fixes_applied: true, Agent Output section) and wrote this activity report (JSON + MD)."
+    ],
+    "files": {
+      "created": [],
+      "modified": [
+        "infra/containers/candelamoon-docs/Containerfile",
+        "infra/containers/candelamoon-docs/validate-design",
+        ".maestro-space/maestro-works/phase-1-delivery-system/p1-002-candelamoon-docs-containerfile/handoff.md",
+        ".maestro-space/maestro-works/phase-1-delivery-system/p1-002-candelamoon-docs-containerfile/bach-senior-developer-activity-report.md",
+        ".maestro-space/maestro-works/phase-1-delivery-system/p1-002-candelamoon-docs-containerfile/bach-senior-developer-activity-report.json"
+      ]
+    },
+    "verification": {
+      "build_command": "podman build --pull=never -t candelamoon-docs:phase2 -f infra/containers/candelamoon-docs/Containerfile .",
+      "build_result": "23/23 steps, Successfully tagged localhost/candelamoon-docs:phase2",
+      "built_image_id": "127a1439acb4a1478c9da085ade5fe2dd04466111a187b8f44a930d28e2a9b20",
+      "built_image_size_bytes": 771003453,
+      "sec02_pip_flow": {
+        "download_phase_user": "builder (uid 1000)",
+        "download_command": "python3 -m pip download --no-cache-dir --require-hashes --no-deps --only-binary=:all: -r /tmp/requirements.lock -d /tmp/pip-wheelhouse",
+        "download_result": "9 wheels Saved to /tmp/pip-wheelhouse (incl. PyYAML-6.0.2-cp311-cp311-manylinux_2_17_x86_64.whl, rpds_py-2026.6.3-cp311-cp311-...whl); wheelhouse asserts passed (9/9 .whl)",
+        "install_phase_user": "root",
+        "install_command": "python3 -m pip install --no-cache-dir --require-hashes --no-deps --only-binary=:all: --no-index --find-links=/tmp/pip-wheelhouse -r /tmp/requirements.lock",
+        "install_result": "Looking in links: /tmp/pip-wheelhouse; all 9 wheels processed locally; rm -rf /tmp/pip-wheelhouse /tmp/requirements.lock ran",
+        "image_cleanup": "wheelhouse and lock absent from final image (/tmp has only node-compile-cache)"
+      },
+      "ac7_network_none": {
+        "python3": "Python 3.11.15",
+        "node": "v22.23.2",
+        "npm": "10.9.8",
+        "markdownlint": "0.45.0",
+        "yamllint": "yamllint 1.37.1",
+        "markdown_link_check": "3.13.7",
+        "id": "uid=1000(builder) gid=1000(builder) groups=1000(builder)",
+        "default_cmd": "exit 0; 'OK: all design validator tools present and runnable' (8/8 OK)",
+        "network_unreachable": "curl: (6) Could not resolve host: pypi.org (exit 6)"
+      },
+      "pip_lock": {
+        "pip_freeze_entries": 10,
+        "matches_locked_set": true,
+        "packaging_origin": "pre-installed in python:3.11-slim base (not part of the lock)"
+      },
+      "negative_paths": {
+        "unknown_arg": "exit 2 (LASTEXITCODE=2), usage on stderr",
+        "extra_args": "exit 2, usage on stderr"
+      },
+      "home_builder_hygiene": {
+        "contents": "3 skeleton files (.bashrc/.profile/.bash_logout) + empty .cache/pip + .npm, all builder:builder",
+        "pip_cache_baked": false
+      },
+      "sec01_proof": {
+        "red_old_image": "candelamoon-docs:review - /workspace/jsonschema.py with print('PWNED-JSONSCHEMA') + spoofed __version__ = '4.23.0' -> 'OK: jsonschema PWNED-JSONSCHEMA', exit 0 (attacker code executed as builder AND false green)",
+        "green_new_image": "candelamoon-docs:phase2 - same jsonschema.py + yaml.py in /workspace, run from /workspace -> 8/8 OK, exit 0, real modules, no PWNED output",
+        "isolation_mechanism": "python3 -I (isolated mode: CWD/PYTHONPATH/user-site not on sys.path) + 'cd /' at script startup"
+      },
+      "reproducibility_two_builds": {
+        "file_lists_identical": true,
+        "tree_counts_bytes": {
+          "/opt/node": "9446 files / 231786503 bytes (both)",
+          "/usr/local": "2446 files / 45964552 bytes (both)",
+          "/home/builder": "3 files / 4553 bytes (both)",
+          "/workspace": "0 files / 0 bytes (both)"
+        },
+        "pip_freeze_md5": "a6a8985ae93cb0ae5bfbc36da7ad0cf9 (both; identical to phase-1 review round)",
+        "file_list_md5": "dca115fa79e5b76fc5539935c14c013e (both)",
+        "image_size_bytes": "771003453 vs 771003454 (1-byte Podman gzip non-determinism, known debt)",
+        "image_ids": "127a1439acb4 vs 413c5b0948b7 (digests b7c0d722... vs 3a5da59a... differ - Podman gzip, known debt)"
+      },
+      "build_logs": [
+        "%TEMP%/opencode/p1-002-phase2/build-phase2.log",
+        "%TEMP%/opencode/p1-002-phase2/build-phase2-repro.log"
+      ]
+    },
+    "deviations": [
+      "--no-cache-dir added to the pip download phase: Brahms' SEC-02 sketch omits it, but a builder-run pip download without it would bake the HTTP/wheel cache under /home/builder/.cache/pip, defeating AC8 (the same reason PIP_NO_CACHE_DIR was scoped out of the runtime ENV in patch-3).",
+      "Wheelhouse created by the builder itself (mkdir in the download RUN) instead of a root RUN + chown - one less root-owned intermediate path; builder-owned and cleaned up by the root install phase.",
+      "'cd /' placed at script startup (all checks), not just before the Python checks: also stops non-Python tools (e.g. markdownlint config discovery) from resolving files relative to the repository; the Python checks additionally carry -I.",
+      "/home/builder contents changed vs the phase-1 review image: with builder creation moved before npm, useradd --create-home now finds no pre-existing /home/builder, so the Debian skeleton (.bashrc/.profile/.bash_logout, mode 700 home) is present (3 files/4553 bytes vs the phase-1 round's 4/0). Deterministic across builds of this Containerfile; AC8 holds; phase-1 counts superseded."
+    ],
+    "known_issues": [
+      "AC8 digest non-determinism unchanged (Podman layer-tar gzip): content reproducibility verified (identical trees, pip freeze md5 a6a8985a..., file-list md5 dca115fa...); image size differs by 1 byte (771,003,453 vs 771,003,454) and digests differ - same known debt as P1-001/phase-1.",
+      "SEC-03..SEC-06 remain open at the image level by design - deferred-to-CI per Brahms: build-network egress enforcement, npm runtime sandboxing, runtime --network=none enforcement, apt snapshot pinning. Requirements for the CI job definition round and P1-005; image-side controls (wheel-only pip, --ignore-scripts, hash locks, non-root runtime user) are in place.",
+      "jsonschema __version__ DeprecationWarning on stderr (unchanged from phase 1) - harmless; visible only as the first line in --verbose output.",
+      "npm audit debt unchanged (8 vulnerabilities in the locked transitive npm tree) - P1-022 scope; tree locked, cannot drift.",
+      "1-byte image-size difference between the two phase2 builds (771,003,453 vs 771,003,454) - same Podman gzip non-determinism; content identical (file-list md5 equal)."
+    ]
+  },
+  "emitted_at": "2026-08-09T23:40:00Z",
+  "narrative_path": ".maestro-space/maestro-works/phase-1-delivery-system/p1-002-candelamoon-docs-containerfile/bach-senior-developer-activity-report.md"
+}
