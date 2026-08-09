@@ -29,7 +29,7 @@ Pin JDK 17. Eclipse Temurin 17-jdk base for Podman. Rationale: Android Gradle Pl
 - **Tool**: JDK 17 (Eclipse Temurin distribution, amd64)
 - **Exact version**: Temurin 17 (latest patch, e.g. 17.0.15; the precise patch level is fixed by the base-image digest, not a floating tag)
 - **Source URL**: https://adoptium.net/temurin/releases/?version=17
-- **Digest/SHA**: pinned via `docker.io/eclipse-temurin:17-jdk@sha256:<DIGEST>` (resolve at Phase 1: `podman pull docker.io/eclipse-temurin:17-jdk && podman image inspect --format '{{index .RepoDigests 0}}'`)
+- **Digest/SHA**: pinned via `docker.io/eclipse-temurin:17-jdk@sha256:23441a35a47dca0fdd77b1b406adc1f86f29d042033ca9fece736a2633f8ba43` (resolved at Phase 1 on 2026-08-08 via `podman pull docker.io/eclipse-temurin:17-jdk && podman image inspect --format '{{index .RepoDigests 0}}'`; image ID `9da03b73ed12ca502e28ddd65a4d60302f084c484f0235f523808f796c0f7947`, created 2026-08-04 01:27:24 UTC, in-image `java -version` reports `openjdk 17.0.19 2026-04-21` / `OpenJDK Runtime Environment Temurin-17.0.19+10`).
 - **Rationale**: AGP 8.x (here 8.13.0) requires JDK 17 as its minimum; the project has not moved to JDK 21. The Windows host build already runs JDK 17 (`appveyor.yml:11` sets `JAVA_HOME=C:\Program Files\Java\jdk17`); the container must use the same major version so host and container builds produce equivalent bytecode and behave identically. JDK 17 is LTS and supported until at least 2029.
 - **Where used**: `candelamoon-android` image (runtime JDK for Gradle/AGP), `windows-host-test` job (`actions/setup-java` with `java-version: '17'`).
 
@@ -40,16 +40,16 @@ compileSdk 36, targetSdk 34 (Google Play Aug 2026 requires TV apps to target API
 - **Tool**: Android SDK (cmdline-tools, platform-tools, platform 36, build-tools 36)
 - **Exact versions** (installed with `sdkmanager --sdk_root=$ANDROID_HOME`):
 
-  | Component | Package ID | Version |
-  |---|---|---|
-  | Command-line tools | `cmdline-tools;latest` | pin to 16.0 (pin the concrete release at Phase 1, e.g. `cmdline-tools;16.0`) |
-  | Platform tools | `platform-tools` | pin to 36.x (resolve exact at Phase 1) |
-  | Android platform | `platforms;android-36` | 36 (matches `compileSdk = 36`, `app/build.gradle:6`) |
+  | Component | Package ID | Version | Resolved at Phase 1 |
+  |---|---|---|---|
+  | Command-line tools | `cmdline-tools;16.0` | 16.0 (build 13114758) | downloaded from `https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip`; SHA-256 of the zip to be pinned at Phase 1 follow-up (recorded as `TODO(P1-001-followup)` in the Containerfile) |
+  | Platform tools | `platform-tools` (no versioned package ID in repository2-3.xml; pinned in the Containerfile by direct download of the versioned archive) | 37.0.1 (resolved exact) | `platform-tools_r37.0.1-linux.zip` from dl.google.com, verified against the SHA-1 published in repository2-3.xml (`477254aa5f903c15cf51001717bdf347fb6b53e0`) before extraction; the spec said "36.x", 37.0.1 is the resolved exact that ships with cmdline-tools 16.0 |
+  | Android platform | `platforms;android-36` | 36 (matches `compileSdk = 36`, `app/build.gradle:7`) |
   | Build tools | `build-tools;36.0.0` | 36.0.0 |
   | NDK | `ndk;27.0.12077973` | 27.0.12077973 (see NDK section) |
 
 - **Source URLs**: https://developer.android.com/studio#command-line-tools-only ; package metadata from https://dl.google.com/android/repository/repository2-3.xml
-- **Digest/SHA**: `<TBD>` — record the SHA-256 of the cmdline-tools zip and the repository XML revision at Phase 1; the SDK is installed at image build time and the resulting `$ANDROID_HOME` is a pinned cache volume.
+- **Digest/SHA**: cmdline-tools zip downloaded at build time from the URL above; the resulting `$ANDROID_HOME` is a pinned cache volume. SHA-256 of the cmdline-tools zip to be recorded here once captured.
 - **SDK levels**: compileSdk 36 (current stable, `app/build.gradle:6`); targetSdk 34 (`app/build.gradle:12`) — Google Play requires TV apps to target API 34+ from August 2026, so 34 is the floor, not the ceiling; minSdk 28 per ADR 0007 so Android TV 9-11 (API 28-30) devices remain installable. Note: the checkout currently declares `minSdk 21` (`app/build.gradle:11`) — the roadmap raises it to 28 under ADR 0007; the Containerfile and CI matrix must not assume values below 28.
 - **Licenses**: all SDK licenses accepted at image build time (`yes | sdkmanager --licenses`); the license acceptance is part of the image layer so runtime steps run network-free.
 - **Rationale**: pinning cmdline-tools and platform-tools prevents SDK self-update drift between the container image and cached `$ANDROID_HOME` volumes; version skew here is the classic "works locally, fails in CI" cause.
@@ -164,7 +164,7 @@ Pin base image digests for: candelamoon-android (eclipse-temurin:17-jdk), candel
 
 | Image role | Base image | Registry reference | Digest pin (resolve at Phase 1) |
 |---|---|---|---|
-| `candelamoon-android` | Eclipse Temurin 17 JDK | `docker.io/eclipse-temurin:17-jdk` | `@sha256:<DIGEST android>` |
+| `candelamoon-android` | Eclipse Temurin 17 JDK | `docker.io/eclipse-temurin:17-jdk` | `@sha256:23441a35a47dca0fdd77b1b406adc1f86f29d042033ca9fece736a2633f8ba43` (resolved 2026-08-08; image ID `9da03b73ed12ca502e28ddd65a4d60302f084c484f0235f523808f796c0f7947`, created 2026-08-04 01:27:24 UTC) |
 | `candelamoon-docs` | Python 3.11 slim | `docker.io/library/python:3.11-slim` | `@sha256:<DIGEST docs>` |
 | `candelamoon-security` | TBD Phase 1 (candidate: python:3.11-slim + distroless/static scanner binaries) | TBD | `@sha256:<DIGEST security>` |
 | `luminal-contract` | Python 3.11 slim | `docker.io/library/python:3.11-slim` | `@sha256:<DIGEST luminal>` |
