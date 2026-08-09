@@ -1,0 +1,120 @@
+[
+  {
+    "id": "SEC-01",
+    "title": "Workspace files can hijack Python imports",
+    "red-team-reference": "SEC-01 (HIGH): Workspace files hijack Python version checks",
+    "assessment": "Confirmed. validate-design runs python3 -c from the /workspace bind mount, so the current directory can precede site-packages and a repository jsonschema.py or yaml.py can execute as builder.",
+    "mitigation": [
+      "Change both Python import checks to python3 -I -c so current-directory, PYTHONPATH, and user-site imports cannot satisfy the check.",
+      "Add cd / before validation checks; future document validation must use explicit paths such as /workspace/docs.",
+      "Apply the isolated-python rule to every future Python validator command."
+    ],
+    "side-effects": [
+      "Local project modules and user-site packages can no longer satisfy imports, which is intentional because these checks must test image-baked dependencies.",
+      "Future validation code must use explicit trusted image paths and explicit workspace paths.",
+      "No new privilege or network capability is introduced."
+    ],
+    "disposition": "apply-now"
+  },
+  {
+    "id": "SEC-02",
+    "title": "pip can execute a source distribution as root",
+    "red-team-reference": "SEC-02 (CRITICAL): pip executes untrusted distribution as ROOT",
+    "assessment": "Confirmed. --require-hashes authenticates an artifact but does not require a wheel; the current pip install runs before USER builder, and an accepted sdist can execute setup.py or a PEP 517 backend as UID 0.",
+    "mitigation": [
+      "Move builder creation and identity checks before the pip block.",
+      "As builder, run pip download with --require-hashes --no-deps --only-binary=:all: into a builder-owned wheelhouse.",
+      "As root, install only from that local wheelhouse with --no-index --only-binary=:all: --require-hashes, then remove the wheelhouse and lock.",
+      "Regenerate or reject the lock if a target package has no compatible Python 3.11 Linux x86_64 wheel; retain --only-binary=:all: so future changes fail closed."
+    ],
+    "side-effects": [
+      "A package without a compatible wheel causes a deliberate build failure and requires a reviewed lock refresh.",
+      "The extra wheelhouse layer uses temporary build space but is removed before the final image.",
+      "Runtime package code remains a separate concern and still requires the SEC-04 sandbox."
+    ],
+    "disposition": "apply-now"
+  },
+  {
+    "id": "SEC-03",
+    "title": "Build-time network allowlist is only documentation",
+    "red-team-reference": "SEC-03 (HIGH): Build-time network allowlist is documentation only",
+    "assessment": "Confirmed. Containerfile comments do not constrain DNS, redirects, proxy behavior, dependency code, or the network namespace used by apt, curl, pip, and npm.",
+    "mitigation": [
+      "Use a dedicated default-deny CI build network and allow only reviewed package endpoints or an approved package proxy; block direct IP, IPv6, host-network, loopback, and RFC1918 bypasses.",
+      "Invoke Podman with the named restricted build network and reject host or unrestricted network modes in CI policy.",
+      "Prefer prefetching all artifacts through the allowlisted network and running the actual image build with podman build --network=none and local inputs."
+    ],
+    "side-effects": [
+      "Repository redirects and CDN changes require an owned allowlist update.",
+      "Prefetching adds cache and build-context management.",
+      "A proxy must not become a broad bypass; preserve TLS verification and keep proxy trust material out of image layers."
+    ],
+    "disposition": "defer-to-CI"
+  },
+  {
+    "id": "SEC-04",
+    "title": "npm --ignore-scripts does not sandbox runtime JavaScript",
+    "red-team-reference": "SEC-04 (HIGH): npm --ignore-scripts doesn't sandbox runtime code",
+    "assessment": "Confirmed. --ignore-scripts suppresses lifecycle hooks during npm ci, but markdownlint, markdown-link-check, and transitive JavaScript still execute when the validator invokes their version commands or a caller runs the CLIs.",
+    "mitigation": [
+      "Retain npm ci --ignore-scripts, exact package-lock integrity, and root-owned /opt/node as install-time controls.",
+      "Require CI to run all validation commands as UID 1000 with --network=none, --read-only, --cap-drop=ALL, and --security-opt=no-new-privileges, using read-only source mounts and bounded tmpfs output.",
+      "Disallow socket, credential, host-namespace, privileged, and arbitrary-entrypoint mounts; use a separate restricted job for any intentional link checking."
+    ],
+    "side-effects": [
+      "Read-only execution may require a temporary directory or explicit output mount.",
+      "Offline execution cannot perform a networked link check; that must be separately authorized.",
+      "Third-party code still runs, but only as an unprivileged process in a disposable capability-free container."
+    ],
+    "disposition": "defer-to-CI"
+  },
+  {
+    "id": "SEC-05",
+    "title": "Runtime network isolation is not enforced",
+    "red-team-reference": "SEC-05 (HIGH): Runtime network isolation not enforced",
+    "assessment": "Confirmed. The CMD and comments recommend --network=none, but ordinary podman run uses the engine default and callers can override command or entrypoint; markdown-link-check is network-capable and can become an SSRF primitive.",
+    "mitigation": [
+      "Make the CI merge gate use podman run --rm --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges --user=1000:1000 with a read-only /workspace mount and bounded tmpfs /tmp, invoking only validate-design.",
+      "Reject privileged mode, host networking, arbitrary entrypoints, secret mounts, and runtime socket mounts in centrally owned CI policy.",
+      "For intentional link checking, validate destinations and use a separate non-host network with an egress proxy that blocks loopback, link-local, RFC1918, metadata, and internal destinations."
+    ],
+    "side-effects": [
+      "The normal validation path is offline and may need explicit temporary output storage.",
+      "Networked link checking requires a separate authorized job and policy.",
+      "A negative network test must use a controlled endpoint and add no credentials to the image."
+    ],
+    "disposition": "defer-to-CI"
+  },
+  {
+    "id": "SEC-06",
+    "title": "apt package versions drift",
+    "red-team-reference": "SEC-06 (MEDIUM): Unversioned apt packages drift",
+    "assessment": "Confirmed. apt-get update and unversioned installs resolve current repository state; a digest-pinned base does not pin the later Debian package index or package revisions. This is the known shared P1-001 issue.",
+    "mitigation": [
+      "Use a reviewed Debian snapshot or internal apt snapshot proxy selected alongside the base-image digest while retaining Release signature verification.",
+      "Maintain an apt lock/manifest for ca-certificates, curl, git, xz-utils, and dependencies; install package=version and assert the result with dpkg-query.",
+      "Make CI fail when the snapshot identifier or installed manifest differs from the reviewed record, and refresh snapshot and base digest together."
+    ],
+    "side-effects": [
+      "Snapshot maintenance can cause failures when packages or dependencies change.",
+      "Security fixes wait for the reviewed refresh, so the refresh cadence must be explicit.",
+      "Signature verification must remain enabled; an unrestricted mirror is not an acceptable mitigation."
+    ],
+    "disposition": "defer-to-CI"
+  },
+  {
+    "id": "SEC-07",
+    "title": "Default validator checks presence, not document semantics",
+    "red-team-reference": "SEC-07 (MEDIUM): Default validator is tool-presence only",
+    "assessment": "The capability observation is accurate, but it is not an exploitable container-security defect in P1-002. Both the Containerfile and validate-design explicitly document MVP tool-presence scope and the P1-017 follow-up.",
+    "mitigation": [
+      "Make no merge-blocking security change for P1-002; retain the fail-closed tool/version checks.",
+      "Track schema, ADR, capability-matrix, and evidence-manifest validation in P1-017, using isolated Python and explicit /workspace paths when implemented."
+    ],
+    "side-effects": [
+      "Pulling semantic document validation into P1-002 expands scope and introduces parser/input attack surface without fixing a current container escape.",
+      "The P1-017 follow-up should receive its own threat model and tests."
+    ],
+    "disposition": "dismiss"
+  }
+]

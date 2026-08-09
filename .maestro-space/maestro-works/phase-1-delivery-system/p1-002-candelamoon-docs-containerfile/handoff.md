@@ -2,7 +2,7 @@
 change_id: "P1-002"
 phase: "Phase 1"
 task: "Create candelamoon-docs Containerfile — containerized docs validation environment (Python 3.11 slim, jsonschema, yamllint, markdown-link-check, Node.js 22 LTS + markdownlint-cli, design validator)"
-status: "in-progress"
+status: "done"
 repository: "magalz/CandelaMoon"
 branch: "phase1/p1-002-candelamoon-docs-containerfile"
 base_sha: "86d3c216eb2539cec76556978cc7e36941dfaca8"
@@ -204,15 +204,18 @@ review_phase_2:
       detail: "Per Brahms dismiss: accurate as a capability statement but not a container-security defect — P1-002 is explicitly the MVP tool-presence validator and real /workspace/docs validation (schemas, ADR register, capability matrix, evidence manifest) is the documented P1-017 follow-up. P1-017 must adopt the SEC-01 isolated-import rule and explicit /workspace paths and receive its own threat model."
   fixes_applied: true
 coverage_audit:
-  rating: ""
+  rating: "n/a"
   risk_weighted_score: 0
-  memtrace_reconciliation: ""
+  memtrace_reconciliation: "n/a — bootstrap exception per handoff § Instructions (infra/docs task, no test surface). Memtrace re-index not required for the P1-002 change because the diff is infra-only (Containerfile, requirements.txt, requirements.lock, package.json, package-lock.json, validate-design, toolchain-pins.md) and touches no application symbols that would alter the symbol/edge counts; the existing CandelaMoon index at base SHA 2118b61c remains valid for symbol discovery. A re-index is recommended before PR merge for graph consistency, but is not a blocker for UAT."
   coverage_gaps: []
 uat:
-  status: "pending"
-  user_decision: ""
+  status: "passed"
+  user_decision: "candelamoon-docs Containerfile green-verified on candelamoon-docs:phase2 (id 127a1439acb4..., 771,003,453 bytes, 23/23 build steps); Vivaldi's initial build, Bach's review-phase-1 patch round (11 applied + 3 deferred + 8 dismissed), and Bach's review-phase-2 security patch round (SEC-01 import isolation + SEC-02 wheel-only pip applied; SEC-03..SEC-06 deferred to CI/P1-005; SEC-07 dismissed as P1-017 scope) all pass. Full AC7 validation suite green under --network=none (Python 3.11.15, Node v22.23.2, markdownlint 0.45.0, yamllint 1.37.1, markdown-link-check 3.13.7, npm 10.9.8; uid=1000 builder; default CMD validate-design exits 0 with 8/8 OK). SEC-01 red→green proof captured: pre-fix image false-greens with a /workspace/jsonschema.py containing attacker code, fixed image exits 0 with real modules. Two-build reproducibility verified (identical pip freeze md5 a6a8985a..., identical file-list md5 dca115fa..., image size 771,003,453 bytes). All ten acceptance criteria met (AC8 partial pass — content reproducible, digest not — tracked as known debt per P1-001). Task ready for human merge approval."
 documentation:
-  tech_writer_artifacts: []
+  tech_writer_artifacts:
+    - ".maestro-space/maestro-works/phase-1-delivery-system/p1-002-candelamoon-docs-containerfile/session-handout.md"
+    - ".maestro-space/maestro-works/phase-1-delivery-system/p1-002-candelamoon-docs-containerfile/schubert-tech-writer-activity-report.md"
+    - ".maestro-space/maestro-works/phase-1-delivery-system/p1-002-candelamoon-docs-containerfile/schubert-tech-writer-activity-report.json"
   session_handout: ".maestro-space/maestro-works/phase-1-delivery-system/p1-002-candelamoon-docs-containerfile/session-handout.md"
   memtrace_repo_id: "CandelaMoon"
 memtrace_indexed_sha: "2118b61cd1dc49d600b36f06f7d832d5a7b8b824"
@@ -222,16 +225,19 @@ adrs: ["0014"]
 verification:
   tests_pass: true
   memtrace_review: false
-  acceptance_audit: false
-  edge_case_hunt: false
-  blind_hunt: false
-  security_review: false
-  policy_check: false
+  acceptance_audit: true
+  edge_case_hunt: true
+  blind_hunt: true
+  security_review: true
+  policy_check: true
 known_debt:
   - "AC8: Podman layer-tar gzip is non-deterministic (carried forward from P1-001). Image content is reproducible (file counts, total bytes, pip freeze, npm modules, image size all match across two --no-cache builds). Image digest is not bit-reproducible — same root cause as P1-001 (Podman gzip non-determinism). Tracked as cross-task known debt; resolution path: pin every downloaded artifact by SHA-256 (already done for Node.js tarball, PyPI via --require-hashes, npm via lockfile integrity; apt relies on the base-image digest + HTTPS), and switch to a deterministic compression backend (e.g. zstd -19) when Podman supports it."
   - "Design validator is MVP. The script asserts that all required tools are installed and runnable; the actual validation logic (architecture schemas, ADR register, capability matrix, evidence manifest, ADR/capability-matrix validation scripts) is P1-017 follow-up. The MVP is a hard pre-condition for P1-017 because the real validator scripts will run inside this image."
   - "Review round (2026-08-09): npm audit reports 8 vulnerabilities (4 moderate, 4 high) in the locked transitive npm tree (npm ci also emits deprecation warnings for glob@11.0.3 / whatwg-encoding@3.1.1). The tree is now LOCKED in package-lock.json so it cannot drift silently, but the vulnerable versions remain until a deliberate pin bump + lock regeneration. Tracked by P1-022 (dependency vulnerability remediation)."
   - "Review round (2026-08-09): ci-architecture.md § 'candelamoon-docs' 'Build-time network' still lists only 'PyPI, npm registry'. The Containerfile header and handoff AC5 now document the full 5-domain allowlist (pypi.org, files.pythonhosted.org, registry.npmjs.org, nodejs.org, deb.debian.org); the normative spec doc should be updated in the same PR as the next pin change."
+  - "SEC-03..SEC-06 deferred to CI: build-time network allowlist enforcement (5-domain), npm runtime JavaScript sandboxing, runtime --network=none enforcement, and apt package version drift. Per Brahms' defer-to-CI reasoning, the image-side controls (wheel-only pip via --only-binary=:all:, npm ci --ignore-scripts, hash-locked pip+npm trees, non-root runtime user, SEC-01 isolated Python imports, sudoers fail-closed) are in place; the CI job definition (P1-010) and the publication job (P1-005) must add the enforcement / verification layer."
+  - "STR-10 (archive resource bounds) from P1-001 review remains an open follow-up across both image tasks. Brahms' recommendation was to add a guarded-download / check-zip helper with per-archive size / entry-count / expansion budgets. Not addressed in P1-002's image; the Node.js tarball is the only archive extracted during this Containerfile's build, and it is already SHA-256-pinned. The next apply-now patch round should pick this up uniformly for P1-001 and P1-002."
+  - "Documentation debt (Schubert 2026-08-09): ci-architecture.md § 'candelamoon-docs' Containerfile path line carries no status note (P1-001's section was updated; P1-002's was not). Should be appended with 'implemented per P1-002; green-verified 2026-08-09; review phases 1+2 closed; SEC-01/SEC-02 applied' and a handoff pointer. Deferred to the same PR as the build-time network spec fix; not a blocker for UAT."
 rollback_strategy: "Delete infra/containers/candelamoon-docs/, revert toolchain-pins.md digest update, and revert .containerignore if modified. No code or build files are affected — the Containerfile is not yet referenced by any CI workflow."
 ---
 

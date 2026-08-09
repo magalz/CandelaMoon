@@ -1,0 +1,243 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "findings",
+  "agent": {
+    "name": "Berlioz (Blind Hunter)",
+    "role": "Cold, adversarial implementation reviewer",
+    "subagent_type": "berlioz-blind-hunter",
+    "dispatched_by": "not provided",
+    "task_id": "P1-002"
+  },
+  "task": {
+    "change_id": "P1-002",
+    "phase": "Phase 1",
+    "phase_short": "phase-1-delivery-system",
+    "branch": "not provided",
+    "base_sha": "86d3c216eb2539cec76556978cc7e36941dfaca8",
+    "head_sha": "e37c8c189b2505b11e36093c629fe6430839031f",
+    "pr_url": ""
+  },
+  "data": {
+    "review_phase": 1,
+    "findings": [
+      {
+        "id": "B-01",
+        "title": "validate-design is a tool-presence smoke test, not design validation",
+        "severity": "critical",
+        "detail": "The specification requires validation of architecture schemas, the ADR register, the capability matrix, and the evidence manifest. This script only probes command versions and explicitly does not read or parse /workspace/docs; invalid or missing design documents therefore still produce exit 0 and a false-green docs gate.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/validate-design",
+          "line": 9
+        },
+        "evidence": "docs/infrastructure/ci-architecture.md:72; validate-design:9-13 and 83-123.",
+        "suggested_route": "patch"
+      },
+      {
+        "id": "B-02",
+        "title": "Required ADR/capability-matrix validation scripts are absent",
+        "severity": "high",
+        "detail": "The image contract separately names ADR/capability-matrix validation scripts, but the diff only copies requirements.txt and the version-probe validate-design script. No validator implementation is installed or invoked, so the required scripts cannot run in this image.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 205
+        },
+        "evidence": "docs/infrastructure/ci-architecture.md:72; the only validator copy is Containerfile:205.",
+        "suggested_route": "patch"
+      },
+      {
+        "id": "B-03",
+        "title": "Node download escapes the declared build-time network policy",
+        "severity": "high",
+        "detail": "The spec documents PyPI and the npm registry as the candelamoon-docs build-time network. The build additionally fetches a binary from nodejs.org; a comment acknowledging the expansion does not make the Containerfile compliant or enforce an approved proxy/allowlist.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 140
+        },
+        "evidence": "docs/infrastructure/ci-architecture.md:74 versus curl https://nodejs.org/... at Containerfile:140.",
+        "suggested_route": "decision-needed"
+      },
+      {
+        "id": "B-04",
+        "title": "APT mirror access is also outside the documented build network",
+        "severity": "high",
+        "detail": "apt-get update and apt-get install require live Debian repository endpoints, none of which are listed in the image's build-time network declaration. A build restricted to the documented PyPI/npm hosts will fail before installing Node or the validators.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 117
+        },
+        "evidence": "docs/infrastructure/ci-architecture.md:74; unqualified APT update/install at Containerfile:117-123.",
+        "suggested_route": "decision-needed"
+      },
+      {
+        "id": "B-05",
+        "title": "The digest-pinned base does not pin the APT package set",
+        "severity": "high",
+        "detail": "A digest freezes the base filesystem and its repository configuration, not the package versions returned by a later apt-get update against a moving Debian suite. ca-certificates, curl, git, and xz-utils can change between builds, undermining both supply-chain review and reproducibility; the comment claiming the base pins package revisions is not a control.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 117
+        },
+        "evidence": "Unversioned package install at Containerfile:117-123 and the contrary claim at Containerfile:112-116.",
+        "suggested_route": "patch"
+      },
+      {
+        "id": "B-06",
+        "title": "Transitive Python dependencies float despite the pinned dependency claim",
+        "severity": "high",
+        "detail": "Only the three direct requirements are exact-pinned; the file explicitly delegates all transitive resolution to current PyPI metadata, and the Containerfile installs without hashes or a constraints/lock file. A fresh build can therefore contain a different dependency tree from the recorded pip freeze, including a changed or compromised transitive package.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/requirements.txt",
+          "line": 11
+        },
+        "evidence": "Dynamic-resolution statement at requirements.txt:11-14 and un-hashed pip install at Containerfile:167-170.",
+        "suggested_route": "patch"
+      },
+      {
+        "id": "B-07",
+        "title": "npm pins only top-level packages and leaves their dependency trees mutable",
+        "severity": "medium",
+        "detail": "npm install -g package@version fixes the two requested package versions but does not use a lockfile or frozen integrity-checked dependency tree. Transitive npm dependencies are resolved anew from the registry on each build, so the image is not reproducibly pinned by the versions shown in the ENV block.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 188
+        },
+        "evidence": "Two global installs with no lock or constraint input at Containerfile:188-192; only top-level pins are recorded in toolchain-pins.md:125-127.",
+        "suggested_route": "patch"
+      },
+      {
+        "id": "B-08",
+        "title": "The Node payload assumes Linux x86-64 without declaring or handling the platform",
+        "severity": "high",
+        "detail": "The image always downloads node-v...-linux-x64.tar.xz, with no TARGETARCH handling and no explicit linux/amd64 platform contract. On an arm64 build the subsequent npm RUN step can fail with an exec-format error; on an arm64 runtime a successfully copied x64 binary cannot execute.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 140
+        },
+        "evidence": "Hard-coded linux-x64 URL at Containerfile:140; no architecture selection in the surrounding build steps.",
+        "suggested_route": "patch"
+      },
+      {
+        "id": "B-09",
+        "title": "The required report output mount contract is missing",
+        "severity": "high",
+        "detail": "Common conventions require writable /workspace-out/reports and /workspace-out/artifacts output mounts, with mount points created/chowned for builder. The image creates only cache directories and /workspace; it provides no /workspace-out hierarchy or ownership postcondition, so report generation can fail or fall back toward the read-only source mount.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 253
+        },
+        "evidence": "docs/infrastructure/ci-architecture.md:55-57; only cache and /workspace directories are created at Containerfile:253-289.",
+        "suggested_route": "patch"
+      },
+      {
+        "id": "B-10",
+        "title": "USER builder is not the final Containerfile directive",
+        "severity": "medium",
+        "detail": "The common convention says USER builder is the final directive, but WORKDIR and CMD follow it. The implementation weakens the wording to last USER directive, which is not the stated contract and leaves a straightforward structural acceptance check failing.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 295
+        },
+        "evidence": "docs/infrastructure/ci-architecture.md:54; USER builder at Containerfile:295 followed by WORKDIR and CMD at lines 301 and 308.",
+        "suggested_route": "patch"
+      },
+      {
+        "id": "B-11",
+        "title": "Global PIP_NO_CACHE_DIR=1 disables the required runtime pip cache",
+        "severity": "medium",
+        "detail": "The environment variable is baked into the runtime image, not scoped to the build-only pip command. Consequently, a pip-cache:/home/builder/.cache/pip mount cannot cache runtime pip operations, contradicting the stated cache convention and causing offline runtime installs to miss an otherwise declared cache.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 70
+        },
+        "evidence": "Required pip cache mount at docs/infrastructure/ci-architecture.md:56; global PIP_NO_CACHE_DIR=1 at Containerfile:57-70.",
+        "suggested_route": "patch"
+      },
+      {
+        "id": "B-12",
+        "title": "/workspace is created after timestamp normalization",
+        "severity": "medium",
+        "detail": "The reproducibility pass touches /opt/node, /usr/local, and /home/builder, then a later RUN creates /workspace. The new directory retains the current build timestamp, so otherwise identical builds differ in filesystem metadata and layer content whenever the source mount is absent.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 289
+        },
+        "evidence": "find/touch at Containerfile:280-281 precedes mkdir -p /workspace at Containerfile:289.",
+        "suggested_route": "patch"
+      },
+      {
+        "id": "B-13",
+        "title": "Reproducibility normalization and verification omit the APT-modified filesystem",
+        "severity": "medium",
+        "detail": "The normalization pass excludes /etc, /var/lib/dpkg, /var/log, certificate outputs, and other paths changed by APT. The accompanying evidence checks only selected directory counts and bytes, not the complete root filesystem or a deterministic image digest, so it cannot substantiate the broad reproducibility claim.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 280
+        },
+        "evidence": "The pass is restricted to three paths at Containerfile:280-281, while APT mutates the image at lines 117-123 and reproducibility is claimed at lines 266-279.",
+        "suggested_route": "patch"
+      },
+      {
+        "id": "B-14",
+        "title": "Validator version checks do not enforce the pinned versions",
+        "severity": "medium",
+        "detail": "The checks accept any Python 3.11 patch, any Node 22 patch, any npm semver, and any output containing two dotted numbers for every package. Versions such as a future or broken jsonschema, markdownlint, or markdown-link-check release would pass even though the image toolchain pins specify concrete versions.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/validate-design",
+          "line": 105
+        },
+        "evidence": "Broad patterns at validate-design:86, 91, 95, 105-109, and 115-116; exact pins are in requirements.txt:34-45 and toolchain-pins.md:121-127.",
+        "suggested_route": "patch"
+      },
+      {
+        "id": "B-15",
+        "title": "Python dependency checks never import the checked packages",
+        "severity": "medium",
+        "detail": "The jsonschema and pyyaml checks import only importlib.metadata and read distribution metadata. A missing or corrupted jsonschema or yaml module can leave its .dist-info metadata intact and still produce a passing result, contradicting the script's present-and-runnable contract.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/validate-design",
+          "line": 105
+        },
+        "evidence": "The commands at validate-design:105-106 never execute import jsonschema or import yaml.",
+        "suggested_route": "patch"
+      },
+      {
+        "id": "B-16",
+        "title": "Unknown validator arguments are silently accepted",
+        "severity": "medium",
+        "detail": "Only an exact first argument of --verbose is recognized; every typo or extra argument is ignored and the normal checks still return 0. This contradicts the stated fail-closed behavior and allows a misspelled CI invocation to appear successful rather than rejecting invalid input.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/validate-design",
+          "line": 30
+        },
+        "evidence": "Argument parsing at validate-design:30-33 and the fail-closed claim at validate-design:15-17.",
+        "suggested_route": "patch"
+      },
+      {
+        "id": "B-17",
+        "title": "The default command bypasses the required validator and can false-green",
+        "severity": "high",
+        "detail": "The image has no ENTRYPOINT and defaults to CMD [\"bash\"]. A non-interactive podman run image therefore runs a shell rather than validate-design and can exit successfully without validating anything; correctness depends on every caller remembering an explicit command.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/Containerfile",
+          "line": 308
+        },
+        "evidence": "The validator is installed at Containerfile:194-206, but the default runtime command is bash at Containerfile:303-308; the image purpose is docs validation in docs/infrastructure/ci-architecture.md:72-73.",
+        "suggested_route": "patch"
+      },
+      {
+        "id": "B-18",
+        "title": "No negative-path tests or CI integration evidence were added",
+        "severity": "medium",
+        "detail": "The diff contains no automated test or workflow assertion for invalid design documents, missing or broken tools, malformed arguments, read-only source mounts, writable report mounts, or offline execution. The only demonstrated behavior is the happy path, leaving the fail-closed and mount/network contracts unverified.",
+        "location": {
+          "file_path": "infra/containers/candelamoon-docs/validate-design",
+          "line": 52
+        },
+        "evidence": "No test file is added in the reviewed diff; the checker helper begins at validate-design:52 and is only exercised by the success path.",
+        "suggested_route": "patch"
+      }
+    ]
+  },
+  "emitted_at": "2026-08-09T00:00:00Z",
+  "narrative_path": "findings-phase-1-berlioz.md"
+}

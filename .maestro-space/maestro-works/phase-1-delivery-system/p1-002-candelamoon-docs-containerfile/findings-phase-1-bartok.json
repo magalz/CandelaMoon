@@ -1,0 +1,137 @@
+[
+  {
+    "id": "BAR-001",
+    "title": "The Node installation is hard-coded to x86_64 while the base image is platform-selectable",
+    "severity": "high",
+    "detail": "NODE_SHA256_LINUX_X64 and the download URL always select node-v${NODE_VERSION}-linux-x64.tar.xz, but FROM has no --platform=linux/amd64 and no TARGETARCH branch. On arm64, armv7, ppc64le, or another native build, the Python base can resolve for the target architecture, the x64 tarball can extract, and the first npm install then fails with an executable-format error; an emulated build still produces an image that requires emulation at runtime.",
+    "location": "infra/containers/candelamoon-docs/Containerfile:97-100, 139-144",
+    "evidence": "The only architecture selector is the literal linux-x64 URL and its matching x64 SHA variable.",
+    "suggested_route": "patch"
+  },
+  {
+    "id": "BAR-002",
+    "title": "Digest-pinning the base does not pin the unversioned apt packages",
+    "severity": "medium",
+    "detail": "With the same base digest, apt-get update reads live Debian trixie indexes and apt-get install selects current candidates for ca-certificates, curl, git, and xz-utils. A rebuild after a repository update, mirror change, package removal, or expired metadata can install a different tree or fail despite the comment claiming the pinned base prevents drift.",
+    "location": "infra/containers/candelamoon-docs/Containerfile:112-123",
+    "evidence": "Package names have no versions or snapshot source, and the command refreshes indexes on every build.",
+    "suggested_route": "patch"
+  },
+  {
+    "id": "BAR-003",
+    "title": "The pip dependency graph is not actually locked",
+    "severity": "medium",
+    "detail": "Only the three direct requirements are exact-pinned; attrs, pathspec, rpds-py, referencing, and other transitive packages are resolved from current PyPI metadata on each build. A later transitive release, yanked wheel, changed Python constraint, or platform-specific resolution changes the image or makes a rebuild fail. Recording pip freeze after one build is evidence, not a reproducible input.",
+    "location": "infra/containers/candelamoon-docs/requirements.txt:11-14, 34, 39, 45; infra/containers/candelamoon-docs/Containerfile:154-169",
+    "evidence": "The requirements file explicitly says transitive dependencies are resolved at build time, and the install uses only -r requirements.txt.",
+    "suggested_route": "patch"
+  },
+  {
+    "id": "BAR-004",
+    "title": "PyPI artifacts are accepted without hash verification",
+    "severity": "high",
+    "detail": "pip install --no-cache-dir -r /tmp/requirements.txt authenticates HTTPS but does not require hashes. If an index or mirror serves a modified wheel under an allowed version, or a different platform artifact is selected, pip accepts it; exact version syntax alone does not prove artifact identity.",
+    "location": "infra/containers/candelamoon-docs/requirements.txt:11-14, 34, 39, 45; infra/containers/candelamoon-docs/Containerfile:167-170",
+    "evidence": "There are no --hash=sha256 entries and no --require-hashes option.",
+    "suggested_route": "patch"
+  },
+  {
+    "id": "BAR-005",
+    "title": "Global npm installs float transitive packages and execute install hooks as root",
+    "severity": "medium",
+    "detail": "Exact top-level versions do not lock their transitive semver ranges, and no lockfile or package-integrity allowlist is supplied. A later registry resolution can change the installed graph, while npm lifecycle scripts run during both installs as root and may execute changed code or make additional network requests.",
+    "location": "infra/containers/candelamoon-docs/Containerfile:176-192",
+    "evidence": "Both commands are npm install -g name@version with no lockfile, npm ci, hash verification, or script restriction.",
+    "suggested_route": "patch"
+  },
+  {
+    "id": "BAR-006",
+    "title": "Python checks verify distribution metadata, not package importability or behavior",
+    "severity": "medium",
+    "detail": "The comments promise an import check, but the commands only import importlib.metadata and query m.version('jsonschema') or m.version('PyYAML'). If a dist-info directory remains while jsonschema or yaml files are missing, corrupt, or unusable, the command exits zero and the validator reports OK.",
+    "location": "infra/containers/candelamoon-docs/validate-design:98-106",
+    "evidence": "No import jsonschema or import yaml appears in either Python check.",
+    "suggested_route": "patch"
+  },
+  {
+    "id": "BAR-007",
+    "title": "Version regexes can accept the wrong tool or an unrelated warning",
+    "severity": "medium",
+    "detail": "Most checks accept any unanchored [0-9]+\\.[0-9]+ fragment; npm accepts any three-component number, and Node accepts any v22.x patch. If a wrong executable is earlier on a runtime-overridden PATH, or a command exits zero after printing a warning containing a dotted number, the check can pass without proving the pinned tool or version.",
+    "location": "infra/containers/candelamoon-docs/validate-design:61, 86, 91, 95, 105-106, 109, 115-116",
+    "evidence": "The expected patterns do not encode the pinned versions and matching is not anchored to a complete version line.",
+    "suggested_route": "patch"
+  },
+  {
+    "id": "BAR-008",
+    "title": "Unknown command-line arguments are silently ignored",
+    "severity": "low",
+    "detail": "Only the first argument equal to --verbose has an effect; every other argument, including --verbsoe, a path, or an extra option after --verbose, is ignored. The command can return zero while the caller believes it requested a mode or target that was never applied.",
+    "location": "infra/containers/candelamoon-docs/validate-design:30-33",
+    "evidence": "There is no argument-count check, case default, or rejection branch.",
+    "suggested_route": "patch"
+  },
+  {
+    "id": "BAR-009",
+    "title": "The sudoers guard fails open on missing or unreadable files",
+    "severity": "medium",
+    "detail": "grep returns status 2 for a missing path, permission or I/O error, or another read failure; the leading ! converts that error into status 0, so the || error branch is skipped. The common case where /etc/sudoers.d is absent therefore does not prove the check passed, and a matching /etc/sudoers rule can be masked by an error on the second path. The expression also misses indented rules, aliases, and some included or symlinked configurations.",
+    "location": "infra/containers/candelamoon-docs/Containerfile:242-244",
+    "evidence": "The command negates one recursive grep over both paths, suppresses stderr, and treats only grep success as a finding.",
+    "suggested_route": "patch"
+  },
+  {
+    "id": "BAR-010",
+    "title": "Timestamp normalization runs before /workspace is created and skips other generated paths",
+    "severity": "medium",
+    "detail": "The find command normalizes only /opt/node, /usr/local, and /home/builder; the next RUN creates /workspace, whose directory mtime is wall-clock dependent. Apt also changes metadata under /etc and /var, which is never normalized. Two ordinary builds at different times can therefore differ in layer metadata even with the same SOURCE_DATE_EPOCH.",
+    "location": "infra/containers/candelamoon-docs/Containerfile:266-281, 283-289",
+    "evidence": "RUN mkdir -p /workspace appears after the only touch pass, and the touch roots exclude /etc, /var, /tmp, and /workspace.",
+    "suggested_route": "patch"
+  },
+  {
+    "id": "BAR-011",
+    "title": "Replacing linkchecker with markdown-link-check can break existing callers",
+    "severity": "medium",
+    "detail": "The pip linkchecker executable is intentionally omitted and no compatibility wrapper is installed. If a docs job, developer command, or future validator invokes linkchecker or relies on its flags or output format, the image fails with command-not-found or a semantic CLI mismatch even though a differently named npm package is present.",
+    "location": "infra/containers/candelamoon-docs/requirements.txt:16-23; infra/containers/candelamoon-docs/Containerfile:172-192",
+    "evidence": "The requirements comments explicitly say linkchecker is not in the file, while only markdown-link-check is installed globally.",
+    "suggested_route": "patch"
+  },
+  {
+    "id": "BAR-012",
+    "title": "The installed link checker conflicts with the documented network-none runtime path for remote links",
+    "severity": "medium",
+    "detail": "markdown-link-check normally resolves HTTP(S) targets, while the runtime contract says validation runs with --network=none. When the eventual docs validation invokes it on an external link, DNS or connect attempts fail or wait for client timeouts; the current MVP only checks --version, so this incompatibility is not exercised.",
+    "location": "infra/containers/candelamoon-docs/validate-design:19-22, 111-116; infra/containers/candelamoon-docs/Containerfile:172-192",
+    "evidence": "The script says it must make no network calls, but the image installs a network-oriented link checker and exposes no offline mode, URL classification, or timeout policy.",
+    "suggested_route": "decision-needed"
+  },
+  {
+    "id": "BAR-013",
+    "title": "The advertised pip cache volume is disabled by a runtime-persistent environment variable",
+    "severity": "low",
+    "detail": "PIP_NO_CACHE_DIR=1 is an ENV, so it remains set after USER builder; pip will neither read nor populate the /home/builder/.cache/pip cache under its default behavior. If a follow-up validator or developer runs pip in the offline container expecting the documented cache mount to supply artifacts, the install cannot reuse that cache.",
+    "location": "infra/containers/candelamoon-docs/Containerfile:57-60, 66-75, 253-264",
+    "evidence": "The file simultaneously exports PIP_NO_CACHE_DIR=1 and describes /home/builder/.cache/pip as the runtime cache.",
+    "suggested_route": "patch"
+  },
+  {
+    "id": "BAR-014",
+    "title": "Image-time ownership does not protect bind mounts or pre-existing cache volumes",
+    "severity": "low",
+    "detail": "The image chowns /home/builder and /workspace before runtime mounts exist. A host bind mount at /workspace, or an existing pip-cache or npm-cache volume owned by another UID or mode 0700, masks those image paths; uid 1000 then cannot read the source or write the cache. There is no runtime permission diagnostic.",
+    "location": "infra/containers/candelamoon-docs/Containerfile:253-264, 283-301",
+    "evidence": "The only chown operations are build-time RUN steps, followed by a fixed USER builder and documented mount-over paths.",
+    "suggested_route": "patch"
+  },
+  {
+    "id": "BAR-015",
+    "title": "A hung tool can hang the validator indefinitely",
+    "severity": "low",
+    "detail": "check invokes each executable synchronously and has no per-command timeout. A broken filesystem, a runtime PATH override, or a tool waiting on a stalled configuration or cache can leave the whole docs job waiting forever instead of recording an error; the caller's outer CI timeout is the only escape.",
+    "location": "infra/containers/candelamoon-docs/validate-design:52-80",
+    "evidence": "The function captures command substitution output directly and contains no timeout, alarm, or cancellation path.",
+    "suggested_route": "patch"
+  }
+]
